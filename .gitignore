@@ -1,0 +1,15 @@
+# Python (Backend)
+__pycache__/
+*.pyc
+venv/
+.env
+
+# Node.js (Frontend)
+node_modules/
+dist/
+.env.local
+.env.production
+
+# Hệ điều hành
+.DS_Store
+Thumbs.db
