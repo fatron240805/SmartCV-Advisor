@@ -20,7 +20,9 @@ py -3.12 -m venv .venv
 (install trong môi trường ảo)
 python -m pip install --upgrade pip
 
-pip install fastapi "uvicorn[standard]" python-multipart pydantic-settings python-dotenv supabase "PyJWT[crypto]" email-validator openai pymupdf python-docx
+pip install fastapi "uvicorn[standard]" python-multipart pydantic-settings python-dotenv "PyJWT[crypto]" email-validator openai pymupdf python-docx
+
+pip install motor
 
 # run
 
