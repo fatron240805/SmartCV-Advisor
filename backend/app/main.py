@@ -1,11 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from .db import db
 
 app = FastAPI(
     title="SmartCV Advisor API",
     version="0.1.0",
 )
-
 # Cho phép frontend React/Vite gọi backend
 app.add_middleware(
     CORSMiddleware,
