@@ -60,12 +60,12 @@ export function getApiErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
     const detail = error.response?.data?.detail;
     if (typeof detail?.message === 'string') {
-      return detail.message;
+      return typeof detail?.hint === 'string' ? `${detail.message} ${detail.hint}` : detail.message;
     }
     if (typeof detail === 'string') {
       return detail;
     }
-    return 'Không thể kết nối máy chủ. Vui lòng thử lại.';
+    return 'Không thể kết nối backend tại http://127.0.0.1:8000. Kiểm tra backend đang chạy, mở /api/health, hoặc restart backend để nhận cấu hình CORS mới.';
   }
   return 'Đã có lỗi xảy ra. Vui lòng thử lại.';
 }

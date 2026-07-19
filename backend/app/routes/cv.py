@@ -67,7 +67,8 @@ async def upload_cv(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={
                 "code": "DATABASE_UNAVAILABLE",
-                "message": "Chưa lưu được CV vì cơ sở dữ liệu chưa sẵn sàng.",
+                "message": "Chưa lưu được CV vì MongoDB chưa kết nối được.",
+                "hint": "Mở /api/health để xem database.status. Nếu dùng Atlas, kiểm tra DNS/mạng/IP allowlist; nếu dùng local, bật mongod và dùng mongodb://localhost:27017.",
             },
         ) from exc
     return {
@@ -87,6 +88,7 @@ async def get_cv_metadata(cv_id: str, user: dict[str, str] = Depends(get_current
             detail={
                 "code": "DATABASE_UNAVAILABLE",
                 "message": "Chưa kết nối được cơ sở dữ liệu. Vui lòng kiểm tra MongoDB URI hoặc mạng.",
+                "hint": "Mở /api/health để xem trạng thái database hiện tại.",
             },
         ) from exc
 

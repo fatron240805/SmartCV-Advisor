@@ -87,12 +87,27 @@ Mở `backend/.env` và điền giá trị thật:
 ```env
 MONGODB_URI=mongodb://localhost:27017
 MONGODB_DB=smartcv
+MONGODB_SERVER_SELECTION_TIMEOUT_MS=5000
+MONGODB_CONNECT_TIMEOUT_MS=5000
+MONGODB_SOCKET_TIMEOUT_MS=10000
+CORS_ALLOW_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174
+CORS_ALLOW_ORIGIN_REGEX=^http://(localhost|127\.0\.0\.1):517[0-9]$
 OPENAI_API_KEY=your_openai_api_key_here
 OPENAI_MODEL=gpt-4o-mini
+OPENAI_IMAGE_MODEL=gpt-4o-mini
 OPENAI_TIMEOUT_SECONDS=30
+TESSERACT_CMD=
+POPPLER_PATH=
 ```
 
 Nếu dùng MongoDB Atlas, thay `MONGODB_URI` bằng connection string Atlas. Nếu dùng key từng nằm trong notebook prototype, nên rotate/revoke key cũ rồi dán key mới vào `.env`.
+
+Nếu đã cài OCR nhưng PowerShell vẫn báo không thấy lệnh, điền đường dẫn cụ thể:
+
+```env
+TESSERACT_CMD=C:\Program Files\Tesseract-OCR\tesseract.exe
+POPPLER_PATH=C:\poppler\Library\bin
+```
 
 ## 2. Seed dữ liệu demo
 
@@ -124,7 +139,7 @@ Backend chạy tại:
 
 - API: `http://127.0.0.1:8000`
 - Swagger: `http://127.0.0.1:8000/docs`
-- Health check: `http://127.0.0.1:8000/api/health`
+- Health check DB/GPT/OCR: `http://127.0.0.1:8000/api/health`
 
 API chính cho luồng CV:
 
@@ -146,12 +161,13 @@ Pipeline backend lấy cảm hứng từ notebook `Pipeline_CV_role_weighted (1)
    - Đọc text PDF bằng PyMuPDF.
    - Nếu PDF gần như không có text layer (`<300` ký tự), dùng `pdf2image` + `pytesseract` để OCR giống notebook.
    - Đọc text DOCX bằng `python-docx`.
-   - Đọc ảnh CV PNG/JPG/JPEG/WEBP/BMP bằng Pillow + `pytesseract`.
+   - Đọc ảnh CV PNG/JPG/JPEG/WEBP/BMP bằng GPT image model nếu `OPENAI_API_KEY` đã cấu hình.
+   - Nếu GPT ảnh không khả dụng, fallback sang Pillow + `pytesseract` giống notebook.
    - Gọi GPT để tách section chuẩn: `Professional Summary`, `Education`, `Experience`, `Projects`, `Technical Skills`, `Certifications`, `Other`.
    - Nếu không có `OPENAI_API_KEY` hoặc GPT lỗi, fallback sang rule-based section parser.
 
 2. `gpt_service.py`
-   - Đọc `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_TIMEOUT_SECONDS` từ `.env`.
+   - Đọc `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_IMAGE_MODEL`, `OPENAI_TIMEOUT_SECONDS` từ `.env`.
    - Gọi `client.chat.completions.create(...)` với `response_format={"type": "json_object"}` giống hướng notebook.
    - Prompt yêu cầu chỉ trả JSON, không markdown, không bịa thông tin ngoài CV.
 
@@ -222,12 +238,16 @@ MongoDB không kết nối được:
 
 - Kiểm tra `MONGODB_URI`.
 - Nếu dùng Atlas, kiểm tra network/IP allowlist.
+- Nếu dùng Atlas URI dạng `mongodb+srv://...`, lỗi DNS cũng làm upload CV trả `503 DATABASE_UNAVAILABLE`.
+- Mở `http://127.0.0.1:8000/api/health` và kiểm tra `database.available`.
 - Chạy lại `python create_collections.py` sau khi kết nối thành công.
 
 Upload ảnh/PDF scan không đọc được:
 
-- Kiểm tra đã cài Tesseract OCR và Poppler chưa.
-- Kiểm tra Tesseract/Poppler đã nằm trong `PATH` của terminal chạy backend chưa.
+- Ảnh CV sẽ ưu tiên đọc bằng GPT nếu `OPENAI_API_KEY` hợp lệ.
+- Nếu dùng OCR fallback, kiểm tra đã cài Tesseract OCR và Poppler chưa.
+- Kiểm tra Tesseract/Poppler đã nằm trong `PATH` của terminal chạy backend chưa, hoặc đặt `TESSERACT_CMD` và `POPPLER_PATH` trong `backend/.env`.
+- Mở `http://127.0.0.1:8000/api/health` và kiểm tra `ocr.tesseract.available`, `ocr.poppler.available`, `gpt.configured`.
 - Dùng ảnh rõ nét, đủ sáng, không nghiêng nhiều.
 
 Upload DOC cũ bị từ chối:
@@ -238,7 +258,9 @@ Upload DOC cũ bị từ chối:
 Frontend không gọi được backend:
 
 - Kiểm tra backend đang chạy ở port `8000`.
-- Kiểm tra CORS trong `backend/app/main.py`.
+- Nếu frontend mở bằng `http://127.0.0.1:5173`, backend cũng phải cho phép origin này trong CORS.
+- Sau khi sửa `.env` hoặc `backend/app/main.py`, restart backend để CORS mới có hiệu lực.
+- Mở `http://127.0.0.1:8000/api/health`; nếu trang này mở được nhưng frontend vẫn báo không kết nối, gần như chắc là CORS hoặc frontend đang gọi sai URL.
 - Mở Swagger `http://127.0.0.1:8000/docs` để test API trước.
 
 ## 8. Ghi chú bảo mật

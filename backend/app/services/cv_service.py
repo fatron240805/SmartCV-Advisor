@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from io import BytesIO
@@ -13,7 +14,7 @@ from zipfile import BadZipFile
 
 from fastapi import HTTPException, UploadFile, status
 
-from app.services.gpt_service import parse_cv_sections_with_gpt
+from app.services.gpt_service import parse_cv_image_with_gpt, parse_cv_sections_with_gpt
 
 
 MAX_CV_SIZE_BYTES = 5 * 1024 * 1024
@@ -33,6 +34,13 @@ SUPPORTED_MIME_TYPES = {
     "image/x-ms-bmp",
     "application/octet-stream",
     "",
+}
+IMAGE_MIME_TYPES_BY_EXTENSION = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+    ".bmp": "image/bmp",
 }
 
 STANDARD_SECTIONS = [
@@ -112,6 +120,22 @@ SECTION_ALIASES = {
         "khóa học",
     ],
 }
+
+
+def resolve_image_mime_type(extension: str, content_type: str | None) -> str:
+    if content_type and content_type.startswith("image/"):
+        return "image/jpeg" if content_type == "image/pjpeg" else content_type
+    return IMAGE_MIME_TYPES_BY_EXTENSION.get(extension, "image/png")
+
+
+def configure_tesseract(pytesseract: Any) -> None:
+    tesseract_cmd = os.getenv("TESSERACT_CMD", "").strip()
+    if tesseract_cmd:
+        pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
+
+
+def get_poppler_path() -> str | None:
+    return os.getenv("POPPLER_PATH", "").strip() or os.getenv("PDF2IMAGE_POPPLER_PATH", "").strip() or None
 
 
 @dataclass(frozen=True)
@@ -358,15 +382,29 @@ def extract_pdf_text_with_ocr(content: bytes, page_count: int | None) -> Extract
         )
 
     try:
-        images = convert_from_bytes(content, dpi=200)
+        configure_tesseract(pytesseract)
+        images = convert_from_bytes(content, dpi=200, poppler_path=get_poppler_path())
         page_texts = [pytesseract.image_to_string(image) for image in images]
+    except pytesseract.TesseractNotFoundError:
+        return ExtractionResult(
+            text="",
+            page_count=page_count,
+            method="ocr_unavailable",
+            language_hints=["unknown"],
+            warnings=[
+                "PDF scan cần Tesseract OCR nhưng backend chưa tìm thấy tesseract trong PATH hoặc TESSERACT_CMD."
+            ],
+            quality_score=0.0,
+        )
     except Exception:
         return ExtractionResult(
             text="",
             page_count=page_count,
-            method="ocr",
+            method="ocr_unavailable",
             language_hints=["unknown"],
-            warnings=["OCR fallback cho PDF scan chưa đọc được nội dung."],
+            warnings=[
+                "OCR fallback cho PDF scan chưa đọc được nội dung. Kiểm tra Poppler/Tesseract và biến POPPLER_PATH/TESSERACT_CMD."
+            ],
             quality_score=0.0,
         )
 
@@ -420,7 +458,25 @@ def extract_docx_text(content: bytes) -> ExtractionResult:
     )
 
 
-def extract_image_text(content: bytes) -> ExtractionResult:
+def extract_image_text(extension: str, content: bytes, content_type: str | None, user_id: str) -> ExtractionResult:
+    gpt_extraction = parse_cv_image_with_gpt(
+        content=content,
+        mime_type=resolve_image_mime_type(extension, content_type),
+        user_id=user_id,
+        standard_sections=STANDARD_SECTIONS,
+    )
+    if gpt_extraction:
+        warnings = ["Ảnh CV được đọc trực tiếp bằng GPT trước khi chuẩn hóa section."]
+        warnings.extend(gpt_extraction.warnings)
+        return ExtractionResult(
+            text=normalize_text(gpt_extraction.raw_text),
+            page_count=1,
+            method="image_gpt",
+            language_hints=detect_language_hints(gpt_extraction.raw_text),
+            warnings=warnings,
+            quality_score=0.88 if len(gpt_extraction.raw_text) >= 300 else 0.55,
+        )
+
     try:
         from PIL import Image
         import pytesseract
@@ -429,14 +485,25 @@ def extract_image_text(content: bytes) -> ExtractionResult:
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={
                 "code": "CV_IMAGE_OCR_UNAVAILABLE",
-                "message": "Máy chủ chưa cài Pillow/pytesseract để OCR ảnh CV.",
+                "message": "Chưa đọc được ảnh CV vì GPT ảnh chưa khả dụng và máy chủ chưa cài Pillow/pytesseract.",
+                "hint": "Điền OPENAI_API_KEY trong backend/.env hoặc cài Pillow/pytesseract kèm Tesseract OCR.",
             },
         ) from exc
 
     try:
+        configure_tesseract(pytesseract)
         image = Image.open(BytesIO(content))
         image.load()
         text = normalize_text(pytesseract.image_to_string(image))
+    except pytesseract.TesseractNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "code": "CV_IMAGE_OCR_UNAVAILABLE",
+                "message": "Chưa đọc được ảnh CV vì backend chưa tìm thấy Tesseract OCR.",
+                "hint": "Cài Tesseract OCR rồi thêm vào PATH, hoặc đặt TESSERACT_CMD trong backend/.env, hoặc dùng OPENAI_API_KEY để GPT đọc ảnh.",
+            },
+        ) from exc
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -451,18 +518,18 @@ def extract_image_text(content: bytes) -> ExtractionResult:
         page_count=1,
         method="image_ocr",
         language_hints=detect_language_hints(text),
-        warnings=["Ảnh CV được đọc bằng OCR trước khi gửi nội dung text sang GPT."],
+        warnings=["Ảnh CV được đọc bằng OCR cục bộ trước khi gửi nội dung text sang GPT."],
         quality_score=0.82 if len(text) >= 300 else 0.45,
     )
 
 
-def extract_cv_text(extension: str, content: bytes) -> ExtractionResult:
+def extract_cv_text(extension: str, content: bytes, content_type: str | None, user_id: str) -> ExtractionResult:
     if extension == ".pdf":
         extraction = extract_pdf_text(content)
     elif extension == ".docx":
         extraction = extract_docx_text(content)
     elif extension in SUPPORTED_IMAGE_EXTENSIONS:
-        extraction = extract_image_text(content)
+        extraction = extract_image_text(extension, content, content_type, user_id)
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -473,11 +540,12 @@ def extract_cv_text(extension: str, content: bytes) -> ExtractionResult:
         )
 
     if len(extraction.text) < 40:
+        warning_hint = f" {extraction.warnings[0]}" if extraction.warnings else ""
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
                 "code": "CV_TEXT_NOT_READABLE",
-                "message": "Không đọc được đủ nội dung CV để phân tích.",
+                "message": f"Không đọc được đủ nội dung CV để phân tích.{warning_hint}",
             },
         )
 
@@ -537,7 +605,7 @@ async def build_cv_document(
     policy_version: str | None,
 ) -> dict[str, Any]:
     extension = validate_upload_metadata(file, content, consent_accepted)
-    extraction = extract_cv_text(extension, content)
+    extraction = extract_cv_text(extension, content, file.content_type, user_id)
     gpt_sections = parse_cv_sections_with_gpt(
         raw_text=extraction.text,
         user_id=user_id,
