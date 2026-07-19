@@ -1,17 +1,13 @@
-"""Routes for CV analysis and JD matching."""
+"""Routes for CV analysis history, result detail, and suggestions."""
 
 # Định nghĩa route cho phân tích, so sánh kỹ năng và kết quả.
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import List, Dict, Any
 from app.db import db  # Import instance kết nối MongoDB
+from app.routes.dependencies import get_current_user
+from app.services.analysis_service import DATABASE_ERRORS, get_analysis_detail, get_role_by_id
 
 router = APIRouter(prefix="/api/v1/analyses", tags=["Analysis"])
-
-# Mock Dependency lấy user hiện tại (sau này ông Auth sẽ viết hàm decode JWT thay vào đây)
-async def get_current_user():
-    # Giả lập user KH001 (đã có trong file create_collections.py) đang dùng gói Free
-    return {"user_id": "KH001", "current_plan": "free"}
 
 @router.get("", summary="UC-024: Xem lịch sử phân tích")
 async def get_analysis_history(
@@ -32,6 +28,16 @@ async def get_analysis_history(
         },
         # Chuyển mảng cv_info thành object
         {"$unwind": "$cv_info"},
+
+        {
+            "$lookup": {
+                "from": "NGANHNGHIET",
+                "localField": "MaNganh",
+                "foreignField": "_id",
+                "as": "role_info"
+            }
+        },
+        {"$unwind": {"path": "$role_info", "preserveNullAndEmptyArrays": True}},
         
         # Chỉ lấy CV của user hiện tại đang đăng nhập
         {"$match": {"cv_info.MaKH": user_id}},
@@ -46,6 +52,9 @@ async def get_analysis_history(
                 "analysis_id": "$_id",
                 "cv_name": "$cv_info.TenFileGoc",
                 "overall_score": "$DiemTongQuan",
+                "classification": "$XepLoai",
+                "role_id": {"$ifNull": ["$MaNganh", "$cv_info.MaNganh"]},
+                "role_name": "$role_info.TenNganh",
                 "created_at": "$ThoiDiemPT",
                 "status": "$cv_info.TrangThai"
             }
@@ -53,8 +62,20 @@ async def get_analysis_history(
     ]
     
     # Thực thi truy vấn với AsyncIOMotorClient
-    cursor = db["KETQUA_PTCV"].aggregate(pipeline)
-    history_list = await cursor.to_list(length=limit)
+    try:
+        cursor = db["KETQUA_PTCV"].aggregate(pipeline)
+        history_list = await cursor.to_list(length=limit)
+    except DATABASE_ERRORS:
+        return {
+            "data": [],
+            "access_level": user["current_plan"],
+            "meta": {
+                "visible_count": 0,
+                "locked_count": 0,
+                "free_history_limit": 3
+            },
+            "message": "Chưa kết nối được cơ sở dữ liệu lịch sử phân tích."
+        }
     
     # Format datetime object sang ISO string cho JSON response
     for item in history_list:
@@ -66,13 +87,39 @@ async def get_analysis_history(
         return {
             "data": history_list[:3],
             "access_level": "free",
+            "meta": {
+                "visible_count": min(len(history_list), 3),
+                "locked_count": max(0, len(history_list) - 3),
+                "free_history_limit": 3
+            },
             "message": "Nâng cấp Premium để xem toàn bộ lịch sử."
         }
     
     return {
         "data": history_list,
-        "access_level": "premium"
+        "access_level": "premium",
+        "meta": {
+            "visible_count": len(history_list),
+            "locked_count": 0,
+            "free_history_limit": 3
+        }
     }
+
+@router.get("/{analysis_id}", summary="UC-015: Xem điểm tổng quan, điểm thành phần và lỗi cơ bản")
+async def get_analysis_result(analysis_id: str, user: dict = Depends(get_current_user)):
+    detail = await get_analysis_detail(
+        db=db,
+        analysis_id=analysis_id,
+        user_id=user["user_id"],
+    )
+    if not detail.get("role_name") and detail.get("role_id"):
+        try:
+            role = await get_role_by_id(db, detail["role_id"])
+            detail["role_name"] = role["name"]
+            detail["role_description"] = role["description"]
+        except HTTPException:
+            pass
+    return {"data": detail, "access_level": user["current_plan"], "error": None}
 
 @router.get("/{analysis_id}/suggestions", summary="UC-016: Xem gợi ý cải thiện CV")
 async def get_suggestions(analysis_id: str, user: dict = Depends(get_current_user)):

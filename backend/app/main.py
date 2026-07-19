@@ -35,7 +35,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .db import db
 
 # 1. Import các router ông vừa viết
-from .routes import analysis, premium
+from .routes import analysis, cv, premium
 
 app = FastAPI(
     title="SmartCV Advisor API",
@@ -52,6 +52,8 @@ app.add_middleware(
 
 # 2. Đăng ký (include) các router này vào app chính
 app.include_router(analysis.router)
+app.include_router(cv.router)
+app.include_router(cv.career_role_router)
 app.include_router(premium.router)
 
 @app.get("/")
