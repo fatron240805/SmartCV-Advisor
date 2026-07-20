@@ -4,6 +4,73 @@ export interface User {
   email: string;
 }
 
+export interface AuthUser {
+  user_id: string;
+  account_id: string;
+  full_name: string;
+  email: string;
+  role: 'registered' | 'premium' | 'admin' | string;
+  account_type: 'registered' | 'premium' | 'admin' | string;
+  status: string;
+  email_verified: boolean;
+}
+
+export interface AuthSession {
+  user: AuthUser;
+  access_token: string;
+  refresh_token: string;
+  token_type: 'bearer';
+  expires_at: string;
+  refresh_expires_at: string;
+}
+
+export interface VerificationMeta {
+  email_masked: string;
+  delivery: string;
+  demo_verification_token?: string | null;
+  expires_at?: string;
+  already_verified?: boolean;
+}
+
+export interface UserProfile {
+  user_id: string;
+  full_name: string;
+  email: string;
+  avatar_url: string | null;
+  industry_interest: string;
+  target_role: string;
+  current_level: string;
+  account_type: 'registered' | 'premium' | string;
+  account_status: string;
+  registered_at: string;
+  updated_at: string | null;
+  privacy: {
+    training_opt_in: boolean;
+    cv_count: number;
+    deletion_request_status: string | null;
+  };
+  uploaded_cvs: UploadedCvSummary[];
+  data_deletion_requests: DataDeletionRequestSummary[];
+}
+
+export interface UploadedCvSummary {
+  cv_id: string;
+  filename: string;
+  uploaded_at: string;
+  target_role_id: string | null;
+  target_role_name: string | null;
+  status: string;
+}
+
+export interface DataDeletionRequestSummary {
+  request_id: string;
+  scope: string;
+  reason: string;
+  status: string;
+  requested_at: string;
+  resolved_at: string | null;
+}
+
 export interface CareerRole {
   role_id: string;
   name: string;

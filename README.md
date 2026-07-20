@@ -92,6 +92,15 @@ MONGODB_CONNECT_TIMEOUT_MS=5000
 MONGODB_SOCKET_TIMEOUT_MS=10000
 CORS_ALLOW_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174
 CORS_ALLOW_ORIGIN_REGEX=^http://(localhost|127\.0\.0\.1):517[0-9]$
+JWT_SECRET_KEY=change_me_for_local_dev
+JWT_ALGORITHM=HS256
+ACCESS_TOKEN_MINUTES=30
+REFRESH_TOKEN_DAYS=7
+REMEMBER_ME_REFRESH_DAYS=30
+AUTH_MAX_FAILED_LOGIN_ATTEMPTS=5
+AUTH_TEMP_LOCK_MINUTES=15
+EMAIL_TOKEN_MINUTES=30
+PASSWORD_RESET_TOKEN_MINUTES=30
 OPENAI_API_KEY=your_openai_api_key_here
 OPENAI_MODEL=gpt-4o-mini
 OPENAI_IMAGE_MODEL=gpt-4o-mini
@@ -127,6 +136,14 @@ Script sẽ tạo dữ liệu mẫu:
 - Kết quả demo `KQ001`
 - Gói dịch vụ Free/Premium
 
+Tài khoản demo sau khi seed:
+
+| Email | Mật khẩu | Vai trò |
+| --- | --- | --- |
+| `minhan@example.com` | `Demo1234` | Registered |
+| `hoangnam@example.com` | `Demo1234` | Premium |
+| `admin@smartcv.vn` | `Demo1234` | Admin |
+
 ## 3. Chạy backend
 
 ```powershell
@@ -145,6 +162,16 @@ API chính cho luồng CV:
 
 | Method | Endpoint | Use case |
 | --- | --- | --- |
+| `POST` | `/api/v1/auth/register` | UC-008 đăng ký |
+| `POST` | `/api/v1/auth/verify-email` | UC-008 xác thực email |
+| `POST` | `/api/v1/auth/resend-verification` | UC-008 gửi lại email xác thực |
+| `POST` | `/api/v1/auth/login` | UC-009 đăng nhập |
+| `POST` | `/api/v1/auth/forgot-password` | UC-009 quên mật khẩu |
+| `POST` | `/api/v1/auth/reset-password` | UC-009 tạo mật khẩu mới |
+| `POST` | `/api/v1/auth/logout` | UC-010 đăng xuất |
+| `GET` | `/api/v1/users/me` | UC-011 xem hồ sơ cá nhân |
+| `PATCH` | `/api/v1/users/me` | UC-011 cập nhật hồ sơ |
+| `POST` | `/api/v1/users/me/data-deletion-request` | UC-011 yêu cầu xóa dữ liệu |
 | `POST` | `/api/v1/cvs` | UC-012 tải CV + consent |
 | `GET` | `/api/v1/career-roles` | UC-013 chọn vị trí |
 | `POST` | `/api/v1/cvs/{cv_id}/analyses` | UC-014 phân tích/chấm điểm |
@@ -195,6 +222,9 @@ http://127.0.0.1:5173
 
 Các màn hình chính:
 
+- Đăng ký: `http://127.0.0.1:5173/register`
+- Đăng nhập: `http://127.0.0.1:5173/login`
+- Hồ sơ cá nhân: `http://127.0.0.1:5173/profile`
 - Upload/analysis flow: `http://127.0.0.1:5173/upload`
 - Kết quả demo: `http://127.0.0.1:5173/analysis/KQ001`
 - Lịch sử: `http://127.0.0.1:5173/`
@@ -214,6 +244,7 @@ Backend:
 
 ```powershell
 Invoke-RestMethod http://127.0.0.1:8000/api/health
+Invoke-RestMethod http://127.0.0.1:8000/api/v1/users/me
 Invoke-RestMethod http://127.0.0.1:8000/api/v1/career-roles
 Invoke-RestMethod http://127.0.0.1:8000/api/v1/analyses/KQ001
 ```
