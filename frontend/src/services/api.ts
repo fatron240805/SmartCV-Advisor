@@ -1,36 +1,71 @@
-// export async function fetchPlaceholder() {
-//   // Placeholder API call. Replace with axios/fetch implementation.
-//   return Promise.resolve({ message: "API placeholder" });
-// }
-
-// BÊN DƯỚI LÀ ĐĂNG KHOA CẬP NHẬT NGÀY 19/07/2026
-
 import axios from 'axios';
+import type { AnalysisResult, CareerRole, UploadedCv } from '../types';
 
-// Khởi tạo một instance của axios với base URL là địa chỉ của Backend
 const apiClient = axios.create({
   baseURL: 'http://127.0.0.1:8000/api/v1',
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 export const apiService = {
-  // Lấy lịch sử phân tích (UC-024)
+  getCareerRoles: async (): Promise<{ data: CareerRole[] }> => {
+    const response = await apiClient.get('/career-roles');
+    return response.data;
+  },
+
+  uploadCv: async (payload: {
+    file: File;
+    consentAccepted: boolean;
+    policyVersion?: string;
+  }): Promise<{ data: UploadedCv }> => {
+    const formData = new FormData();
+    formData.append('file', payload.file);
+    formData.append('consent_accepted', String(payload.consentAccepted));
+    formData.append('policy_version', payload.policyVersion ?? 'cv-processing-policy-v1');
+
+    const response = await apiClient.post('/cvs', formData);
+    return response.data;
+  },
+
+  createAnalysis: async (
+    cvId: string,
+    careerRoleId: string,
+  ): Promise<{ data: AnalysisResult }> => {
+    const response = await apiClient.post(`/cvs/${cvId}/analyses`, {
+      career_role_id: careerRoleId,
+    });
+    return response.data;
+  },
+
+  getAnalysisResult: async (analysisId: string): Promise<{ data: AnalysisResult; access_level: string }> => {
+    const response = await apiClient.get(`/analyses/${analysisId}`);
+    return response.data;
+  },
+
   getHistory: async (limit: number = 10) => {
     const response = await apiClient.get(`/analyses?limit=${limit}`);
     return response.data;
   },
-  
-  // Lấy gợi ý cải thiện của một CV cụ thể (UC-016)
+
   getSuggestions: async (analysisId: string) => {
     const response = await apiClient.get(`/analyses/${analysisId}/suggestions`);
     return response.data;
   },
 
-  // Lấy danh sách gói dịch vụ (UC-026)
   getPlans: async () => {
     const response = await apiClient.get('/service-plans');
     return response.data;
-  }
+  },
 };
+
+export function getApiErrorMessage(error: unknown): string {
+  if (axios.isAxiosError(error)) {
+    const detail = error.response?.data?.detail;
+    if (typeof detail?.message === 'string') {
+      return typeof detail?.hint === 'string' ? `${detail.message} ${detail.hint}` : detail.message;
+    }
+    if (typeof detail === 'string') {
+      return detail;
+    }
+    return 'Không thể kết nối backend tại http://127.0.0.1:8000. Kiểm tra backend đang chạy, mở /api/health, hoặc restart backend để nhận cấu hình CORS mới.';
+  }
+  return 'Đã có lỗi xảy ra. Vui lòng thử lại.';
+}

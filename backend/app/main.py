@@ -30,12 +30,36 @@
 #     }
 
 #############################BÊN DƯỚI LÀ ĐĂNG KHOA CẬP NHẬT VÀO LÚC 1:06PM 19/07/2026
+import os
+import shutil
+from pathlib import Path
+from typing import Any
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .db import db
+from .db import MONGODB_DB, db
+from .services.analysis_service import DATABASE_ERRORS
+from .services.gpt_service import OPENAI_IMAGE_MODEL, OPENAI_MODEL, is_gpt_configured
 
 # 1. Import các router ông vừa viết
-from .routes import analysis, premium
+from .routes import analysis, cv, premium
+
+DEFAULT_CORS_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
+]
+DEFAULT_CORS_ORIGIN_REGEX = r"^http://(localhost|127\.0\.0\.1):517[0-9]$"
+
+
+def get_cors_origins() -> list[str]:
+    raw_origins = os.getenv("CORS_ALLOW_ORIGINS", "").strip()
+    if not raw_origins:
+        return DEFAULT_CORS_ORIGINS
+
+    return [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
+
 
 app = FastAPI(
     title="SmartCV Advisor API",
@@ -44,7 +68,8 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=get_cors_origins(),
+    allow_origin_regex=os.getenv("CORS_ALLOW_ORIGIN_REGEX", DEFAULT_CORS_ORIGIN_REGEX),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -52,6 +77,8 @@ app.add_middleware(
 
 # 2. Đăng ký (include) các router này vào app chính
 app.include_router(analysis.router)
+app.include_router(cv.router)
+app.include_router(cv.career_role_router)
 app.include_router(premium.router)
 
 @app.get("/")
@@ -60,8 +87,51 @@ def home() -> dict[str, str]:
         "message": "SmartCV Advisor Backend đang hoạt động"
     }
 
-@app.get("/api/health")
-def health_check() -> dict[str, str]:
+
+def dependency_status(command: str, env_vars: tuple[str, ...]) -> dict[str, Any]:
+    configured_by = None
+    configured_available = False
+    for env_var in env_vars:
+        configured_value = os.getenv(env_var, "").strip().strip('"')
+        if not configured_value:
+            continue
+
+        configured_by = env_var
+        configured_path = Path(configured_value)
+        configured_available = configured_path.exists() or shutil.which(configured_value) is not None
+        break
+
+    path_available = shutil.which(command) is not None
     return {
-        "status": "ok"
+        "available": configured_available or path_available,
+        "configured_by": configured_by,
+        "path_available": path_available,
+    }
+
+
+@app.get("/api/health")
+async def health_check() -> dict[str, Any]:
+    database = {"available": True, "name": MONGODB_DB, "error": None}
+    try:
+        await db.command("ping")
+    except DATABASE_ERRORS as exc:
+        database = {
+            "available": False,
+            "name": MONGODB_DB,
+            "error": exc.__class__.__name__,
+        }
+
+    ocr = {
+        "tesseract": dependency_status("tesseract", ("TESSERACT_CMD",)),
+        "poppler": dependency_status("pdftoppm", ("POPPLER_PATH", "PDF2IMAGE_POPPLER_PATH")),
+    }
+    return {
+        "status": "ok" if database["available"] else "degraded",
+        "database": database,
+        "gpt": {
+            "configured": is_gpt_configured(),
+            "text_model": OPENAI_MODEL,
+            "image_model": OPENAI_IMAGE_MODEL,
+        },
+        "ocr": ocr,
     }
