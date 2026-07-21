@@ -24,14 +24,6 @@ export interface AuthSession {
   refresh_expires_at: string;
 }
 
-export interface VerificationMeta {
-  email_masked: string;
-  delivery: string;
-  demo_verification_token?: string | null;
-  expires_at?: string;
-  already_verified?: boolean;
-}
-
 export interface UserProfile {
   user_id: string;
   full_name: string;

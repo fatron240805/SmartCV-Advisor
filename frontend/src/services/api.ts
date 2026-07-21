@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { AnalysisResult, AuthSession, AuthUser, CareerRole, UserProfile, UploadedCv, VerificationMeta } from '../types';
+import type { AnalysisResult, AuthSession, AuthUser, CareerRole, UserProfile, UploadedCv } from '../types';
 
 const AUTH_STORAGE_KEY = 'smartcv_auth_session';
 
@@ -45,7 +45,7 @@ export const apiService = {
     password: string;
     passwordConfirmation: string;
     termsAccepted: boolean;
-  }): Promise<{ data: AuthUser; meta: { verification: VerificationMeta } }> => {
+  }): Promise<{ data: AuthUser; meta: { next_step: string } }> => {
     const response = await apiClient.post('/auth/register', {
       full_name: payload.fullName,
       email: payload.email,
@@ -53,16 +53,6 @@ export const apiService = {
       password_confirmation: payload.passwordConfirmation,
       terms_accepted: payload.termsAccepted,
     });
-    return response.data;
-  },
-
-  verifyEmail: async (token: string): Promise<{ data: AuthUser }> => {
-    const response = await apiClient.post('/auth/verify-email', { token });
-    return response.data;
-  },
-
-  resendVerification: async (email: string): Promise<{ data: VerificationMeta }> => {
-    const response = await apiClient.post('/auth/resend-verification', { email });
     return response.data;
   },
 

@@ -14,9 +14,7 @@ from app.services.auth_service import (
     logout_user,
     refresh_session,
     register_user,
-    resend_verification_email,
     reset_password,
-    verify_email,
 )
 
 
@@ -29,14 +27,6 @@ class RegisterRequest(BaseModel):
     password: str = Field(..., min_length=8, max_length=128)
     password_confirmation: str = Field(..., min_length=8, max_length=128)
     terms_accepted: bool
-
-
-class VerifyEmailRequest(BaseModel):
-    token: str = Field(..., min_length=8)
-
-
-class ResendVerificationRequest(BaseModel):
-    email: str = Field(..., min_length=5, max_length=254)
 
 
 class LoginRequest(BaseModel):
@@ -75,30 +65,7 @@ async def register(payload: RegisterRequest) -> dict[str, Any]:
     )
     return {
         "data": result["user"],
-        "meta": {
-            "next_step": "verify_email",
-            "verification": result["verification"],
-        },
-        "error": None,
-    }
-
-
-@router.post("/verify-email", summary="UC-008: Xác thực email")
-async def verify_email_route(payload: VerifyEmailRequest) -> dict[str, Any]:
-    result = await verify_email(db, payload.token)
-    return {
-        "data": result["user"],
         "meta": {"next_step": "login"},
-        "error": None,
-    }
-
-
-@router.post("/resend-verification", summary="UC-008: Gửi lại email xác thực")
-async def resend_verification(payload: ResendVerificationRequest) -> dict[str, Any]:
-    result = await resend_verification_email(db, payload.email)
-    return {
-        "data": result,
-        "meta": {"next_step": "verify_email"},
         "error": None,
     }
 

@@ -12,6 +12,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [email, setEmail] = useState(searchParams.get('email') ?? '');
+  const justRegistered = searchParams.get('registered') === '1';
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -92,6 +93,12 @@ export default function LoginPage() {
           />
           Ghi nhớ đăng nhập
         </label>
+
+        {justRegistered && !errorMessage && (
+          <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-700">
+            Đăng ký thành công. Bạn có thể đăng nhập ngay.
+          </div>
+        )}
 
         {errorMessage && (
           <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">

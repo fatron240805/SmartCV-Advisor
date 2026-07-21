@@ -307,8 +307,6 @@ Các truy vấn lịch sử phải luôn bắt đầu bằng điều kiện `use
 
 ```text
 POST   /api/v1/auth/register
-POST   /api/v1/auth/verify-email
-POST   /api/v1/auth/resend-verification
 POST   /api/v1/auth/login
 POST   /api/v1/auth/refresh
 POST   /api/v1/auth/logout
@@ -443,7 +441,7 @@ smartcv-advisor/
 
 - [ ] Đăng ký với email, mật khẩu, xác nhận điều khoản.
 - [ ] Hash mật khẩu bằng thuật toán phù hợp.
-- [ ] Xác thực email hoặc cơ chế mock có trạng thái rõ ràng cho demo.
+- [ ] Bỏ qua xác thực email trong MVP; tài khoản Registered được kích hoạt ngay sau khi đăng ký.
 - [ ] Đăng nhập, khóa tạm 15 phút sau 5 lần sai.
 - [ ] Access/refresh token, remember me và revoke token khi logout.
 - [ ] Trang Profile và cập nhật thông tin được phép.

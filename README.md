@@ -99,7 +99,6 @@ REFRESH_TOKEN_DAYS=7
 REMEMBER_ME_REFRESH_DAYS=30
 AUTH_MAX_FAILED_LOGIN_ATTEMPTS=5
 AUTH_TEMP_LOCK_MINUTES=15
-EMAIL_TOKEN_MINUTES=30
 PASSWORD_RESET_TOKEN_MINUTES=30
 OPENAI_API_KEY=your_openai_api_key_here
 OPENAI_MODEL=gpt-4o-mini
@@ -144,6 +143,8 @@ Tài khoản demo sau khi seed:
 | `hoangnam@example.com` | `Demo1234` | Premium |
 | `admin@smartcv.vn` | `Demo1234` | Admin |
 
+Luồng đăng ký hiện tại bỏ qua xác thực email: tài khoản mới được kích hoạt ngay và có thể đăng nhập sau khi đăng ký thành công.
+
 ## 3. Chạy backend
 
 ```powershell
@@ -163,8 +164,6 @@ API chính cho luồng CV:
 | Method | Endpoint | Use case |
 | --- | --- | --- |
 | `POST` | `/api/v1/auth/register` | UC-008 đăng ký |
-| `POST` | `/api/v1/auth/verify-email` | UC-008 xác thực email |
-| `POST` | `/api/v1/auth/resend-verification` | UC-008 gửi lại email xác thực |
 | `POST` | `/api/v1/auth/login` | UC-009 đăng nhập |
 | `POST` | `/api/v1/auth/forgot-password` | UC-009 quên mật khẩu |
 | `POST` | `/api/v1/auth/reset-password` | UC-009 tạo mật khẩu mới |

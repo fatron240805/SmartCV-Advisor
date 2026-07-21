@@ -9,7 +9,6 @@ import RegisterPage from './pages/RegisterPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import LoginPage from './pages/LoginPage';
 import UploadCvPage from './pages/UploadCvPage';
-import VerifyEmailPage from './pages/VerifyEmailPage';
 import { apiService, clearAuthSession, getStoredAuthSession, getStoredAuthUser } from './services/api';
 
 const navigationItems = [
@@ -215,7 +214,6 @@ function AppRoutes() {
   const authPath = [
     '/login',
     '/register',
-    '/verify-email',
     '/forgot-password',
     '/reset-password',
   ].includes(location.pathname);
@@ -225,7 +223,6 @@ function AppRoutes() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
-        <Route path="/verify-email" element={<VerifyEmailPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
       </Routes>
