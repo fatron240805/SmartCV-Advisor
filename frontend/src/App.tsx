@@ -1,8 +1,16 @@
-import { BrowserRouter, Link, Route, Routes, useLocation } from 'react-router-dom';
+import { useState } from 'react';
+import { BrowserRouter, Link, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import AnalysisResultPage from './pages/AnalysisResultPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import HistoryPage from './pages/HistoryPage';
 import PlansPage from './pages/PlansPage';
+import ProfilePage from './pages/ProfilePage';
+import RegisterPage from './pages/RegisterPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
+import LoginPage from './pages/LoginPage';
 import UploadCvPage from './pages/UploadCvPage';
+import VerifyEmailPage from './pages/VerifyEmailPage';
+import { apiService, clearAuthSession, getStoredAuthSession, getStoredAuthUser } from './services/api';
 
 const navigationItems = [
   { label: 'Tổng quan', path: '/', icon: 'grid' },
@@ -50,7 +58,36 @@ function NavIcon({ icon }: { icon: string }) {
 
 function AppShell() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const storedUser = getStoredAuthUser();
+  const displayName = storedUser?.full_name ?? 'Trần Minh An';
+  const displayPlan = storedUser?.account_type === 'premium' ? 'Gói Premium' : 'Gói Free';
+  const initial = (displayName.trim()[0] || 'T').toUpperCase();
   const isAnalysisFlow = location.pathname.startsWith('/upload') || location.pathname.startsWith('/analysis');
+  const pageTitle = isAnalysisFlow
+    ? 'Phân tích CV'
+    : location.pathname === '/plans'
+      ? 'Gói dịch vụ'
+      : location.pathname === '/profile'
+        ? 'Hồ sơ cá nhân'
+        : 'Tổng quan';
+
+  async function handleLogout() {
+    setLoggingOut(true);
+    const session = getStoredAuthSession();
+    try {
+      await apiService.logout(session?.refresh_token);
+    } catch {
+      // Local logout still clears sensitive browser state if the network request fails.
+    } finally {
+      clearAuthSession();
+      setLoggingOut(false);
+      setShowLogoutDialog(false);
+      navigate('/login');
+    }
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -67,7 +104,7 @@ function AppShell() {
             const active =
               item.path === '/upload'
                 ? isAnalysisFlow
-                : item.label === 'Gói dịch vụ' && location.pathname === item.path;
+                : item.path === location.pathname && item.label !== 'Lịch sử phân tích';
             const historyActive = item.label === 'Lịch sử phân tích' && location.pathname === '/';
             return (
               <Link
@@ -93,11 +130,21 @@ function AppShell() {
             <p className="mt-1 text-purple-500">Hết hạn: 09/08/2026</p>
           </div>
           <div className="flex items-center gap-3">
-            <span className="grid h-10 w-10 place-items-center rounded-full bg-blue-100 font-bold text-blue-600">T</span>
+            <span className="grid h-10 w-10 place-items-center rounded-full bg-blue-100 font-bold text-blue-600">{initial}</span>
             <div>
-              <p className="font-semibold text-slate-900">Trần Minh An</p>
-              <p className="text-sm text-slate-400">Gói Premium</p>
+              <p className="font-semibold text-slate-900">{displayName}</p>
+              <p className="text-sm text-slate-400">{displayPlan}</p>
             </div>
+            <button
+              aria-label="Đăng xuất"
+              className="ml-auto grid h-10 w-10 place-items-center rounded-full text-slate-400 hover:bg-slate-50 hover:text-red-600"
+              type="button"
+              onClick={() => setShowLogoutDialog(true)}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
+                <path d="M10 7V5a2 2 0 0 1 2-2h7v18h-7a2 2 0 0 1-2-2v-2M3 12h11m0 0-3-3m3 3-3 3" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
           </div>
         </div>
       </aside>
@@ -109,9 +156,7 @@ function AppShell() {
               Trang chủ
             </Link>
             <span>/</span>
-            <span className="text-slate-700">
-              {isAnalysisFlow ? 'Phân tích CV' : location.pathname === '/plans' ? 'Gói dịch vụ' : 'Tổng quan'}
-            </span>
+            <span className="text-slate-700">{pageTitle}</span>
           </div>
           <div className="flex items-center gap-3">
             <span className="relative grid h-10 w-10 place-items-center rounded-full text-slate-500">
@@ -120,7 +165,7 @@ function AppShell() {
                 <path d="M18 16v-5a6 6 0 0 0-12 0v5l-2 2h16zM10 20h4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </span>
-            <span className="grid h-10 w-10 place-items-center rounded-full bg-blue-100 font-bold text-blue-600">T</span>
+            <span className="grid h-10 w-10 place-items-center rounded-full bg-blue-100 font-bold text-blue-600">{initial}</span>
           </div>
         </header>
 
@@ -129,17 +174,71 @@ function AppShell() {
           <Route path="/upload" element={<UploadCvPage />} />
           <Route path="/analysis/:id" element={<AnalysisResultPage />} />
           <Route path="/plans" element={<PlansPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
           <Route path="*" element={<UploadCvPage />} />
         </Routes>
       </div>
+
+      {showLogoutDialog && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/35 px-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+            <h2 className="text-xl font-bold">Bạn có chắc chắn muốn đăng xuất không?</h2>
+            <p className="mt-3 leading-6 text-slate-500">
+              Phiên làm việc hiện tại sẽ kết thúc và dữ liệu xác thực lưu trên trình duyệt sẽ được xóa.
+            </p>
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              <button
+                className="h-12 rounded-2xl border border-slate-200 font-semibold text-slate-600 hover:border-slate-300"
+                type="button"
+                onClick={() => setShowLogoutDialog(false)}
+              >
+                Hủy
+              </button>
+              <button
+                className="h-12 rounded-2xl bg-blue-600 font-bold text-white hover:bg-blue-700 disabled:bg-blue-300"
+                disabled={loggingOut}
+                type="button"
+                onClick={handleLogout}
+              >
+                {loggingOut ? 'Đang đăng xuất...' : 'Xác nhận đăng xuất'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+function AppRoutes() {
+  const location = useLocation();
+  const authPath = [
+    '/login',
+    '/register',
+    '/verify-email',
+    '/forgot-password',
+    '/reset-password',
+  ].includes(location.pathname);
+
+  if (authPath) {
+    return (
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+      </Routes>
+    );
+  }
+
+  return <AppShell />;
 }
 
 function App() {
   return (
     <BrowserRouter>
-      <AppShell />
+      <AppRoutes />
     </BrowserRouter>
   );
 }

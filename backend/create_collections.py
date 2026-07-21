@@ -7,6 +7,8 @@ from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo import ASCENDING
 
+from app.services.auth_service import hash_password
+
 
 load_dotenv()
 
@@ -100,22 +102,43 @@ async def main():
                     {
                         "_id": "TK_ADM001",
                         "Email": "admin@smartcv.vn",
-
-                        # Thay bằng password hash bcrypt thật
-                        "Matkhau": "CHANGE_ME_BCRYPT_HASH",
-
+                        "EmailNormalized": "admin@smartcv.vn",
+                        "MatKhauHash": hash_password("Demo1234"),
+                        "Role": "admin",
+                        "TrangThai": "active",
+                        "EmailVerified": True,
+                        "FailedLoginCount": 0,
+                        "LockedUntil": None,
+                        "CreatedAt": now,
+                        "UpdatedAt": now,
                         "MaADM": "ADM001",
                     },
                     {
                         "_id": "TK_KH001",
                         "Email": "minhan@example.com",
-                        "Matkhau": "CHANGE_ME_BCRYPT_HASH",
+                        "EmailNormalized": "minhan@example.com",
+                        "MatKhauHash": hash_password("Demo1234"),
+                        "Role": "registered",
+                        "TrangThai": "active",
+                        "EmailVerified": True,
+                        "FailedLoginCount": 0,
+                        "LockedUntil": None,
+                        "CreatedAt": now,
+                        "UpdatedAt": now,
                         "MaKH": "KH001",
                     },
                     {
                         "_id": "TK_KH002",
                         "Email": "hoangnam@example.com",
-                        "Matkhau": "CHANGE_ME_BCRYPT_HASH",
+                        "EmailNormalized": "hoangnam@example.com",
+                        "MatKhauHash": hash_password("Demo1234"),
+                        "Role": "premium",
+                        "TrangThai": "active",
+                        "EmailVerified": True,
+                        "FailedLoginCount": 0,
+                        "LockedUntil": None,
+                        "CreatedAt": now,
+                        "UpdatedAt": now,
                         "MaKH": "KH002",
                     },
                 ],
