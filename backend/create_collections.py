@@ -296,6 +296,7 @@ async def main():
                     {
                         "_id": "NG_FRONTEND",
                         "TenNganh": "Frontend Developer",
+                        "TenNganhNormalized": "frontend developer",
                         "MoTa": (
                             "Phát triển giao diện web với HTML, CSS, "
                             "JavaScript và các thư viện frontend."
@@ -307,6 +308,7 @@ async def main():
                     {
                         "_id": "NG_BACKEND",
                         "TenNganh": "Backend Developer",
+                        "TenNganhNormalized": "backend developer",
                         "MoTa": (
                             "Phát triển API, xử lý nghiệp vụ, cơ sở dữ liệu "
                             "và các dịch vụ phía máy chủ."
@@ -327,6 +329,8 @@ async def main():
                     {
                         "_id": "KN_REACT",
                         "TenKyNang": "ReactJS",
+                        "TenKyNangNormalized": "reactjs",
+                        "NhomKyNang": "Framework",
                         "MoTa": "Thư viện xây dựng giao diện web.",
                         "NgayTao": now,
                         "NgayCapNhat": None,
@@ -335,6 +339,8 @@ async def main():
                     {
                         "_id": "KN_REST_API",
                         "TenKyNang": "REST API",
+                        "TenKyNangNormalized": "rest api",
+                        "NhomKyNang": "Integration",
                         "MoTa": "Thiết kế và sử dụng API theo kiến trúc REST.",
                         "NgayTao": now,
                         "NgayCapNhat": None,
@@ -343,6 +349,8 @@ async def main():
                     {
                         "_id": "KN_GIT",
                         "TenKyNang": "Git",
+                        "TenKyNangNormalized": "git",
+                        "NhomKyNang": "Tool",
                         "MoTa": "Quản lý phiên bản mã nguồn.",
                         "NgayTao": now,
                         "NgayCapNhat": None,
@@ -351,6 +359,8 @@ async def main():
                     {
                         "_id": "KN_PYTHON",
                         "TenKyNang": "Python",
+                        "TenKyNangNormalized": "python",
+                        "NhomKyNang": "Language",
                         "MoTa": "Ngôn ngữ lập trình Python.",
                         "NgayTao": now,
                         "NgayCapNhat": None,
@@ -359,6 +369,8 @@ async def main():
                     {
                         "_id": "KN_MONGODB",
                         "TenKyNang": "MongoDB",
+                        "TenKyNangNormalized": "mongodb",
+                        "NhomKyNang": "Database",
                         "MoTa": "Cơ sở dữ liệu NoSQL dạng document.",
                         "NgayTao": now,
                         "NgayCapNhat": None,
@@ -652,10 +664,14 @@ async def main():
             ],
             "DIEMDANHGIA": [
                 (
-                    [("MaKyNang", ASCENDING)],
+                    [
+                        ("MaNganh", ASCENDING),
+                        ("MaKyNang", ASCENDING),
+                    ],
                     {
                         "unique": True,
-                        "name": "uq_diemdanhgia_makynang",
+                        "sparse": True,
+                        "name": "uq_diemdanhgia_manganh_makynang",
                     },
                 )
             ],
@@ -750,6 +766,11 @@ async def main():
                 print(f"Collection already exists: {collection_name}")
 
             collection = db[collection_name]
+
+            if collection_name == "DIEMDANHGIA":
+                existing_indexes = await collection.list_indexes().to_list(length=50)
+                if any(index.get("name") == "uq_diemdanhgia_makynang" for index in existing_indexes):
+                    await collection.drop_index("uq_diemdanhgia_makynang")
 
             # Tạo index
             for keys, options in indexes.get(collection_name, []):

@@ -33,7 +33,7 @@ export default function LoginPage() {
       setSubmitting(true);
       const result = await apiService.login({ email, password, rememberMe });
       saveAuthSession(result.data);
-      navigate(result.data.user.role === 'admin' ? '/' : '/upload');
+      navigate(result.data.user.role === 'admin' ? '/admin/roles' : '/upload');
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error));
     } finally {

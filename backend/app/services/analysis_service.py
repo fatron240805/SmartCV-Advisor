@@ -188,7 +188,49 @@ def normalize_role_document(document: dict[str, Any], skills: list[dict[str, Any
         else "inactive",
         "skills": skills or document.get("skills", []),
         "icon_label": ROLE_ICON_LABELS.get(str(role_id), "IT"),
+        "scoring_config_version": document.get("ScoringConfigVersion", SCORING_CONFIG_VERSION),
     }
+
+
+def importance_from_score_document(score: dict[str, Any]) -> int:
+    value = score.get("MucDoQuanTrong")
+    if isinstance(value, (int, float)):
+        return max(0, min(3, int(value)))
+
+    normalized = normalize_search_text(str(score.get("MucDo", ""))).strip()
+    if normalized in {"core skill", "bat buoc", "rat quan trong"}:
+        return 3
+    if normalized in {"important", "quan trong"}:
+        return 2
+    if normalized in {"nice to have", "nen co"}:
+        return 1
+    return 0
+
+
+async def list_role_skills_from_db(db: Any, role_id: str) -> list[dict[str, Any]]:
+    relations = await db["NGANHNGHE_KYNANG"].find(
+        {"MaNganh": role_id, "TrangThai": {"$nin": ["inactive", "ngung hoat dong", "ngưng hoạt động"]}}
+    ).to_list(length=300)
+    skills: list[dict[str, Any]] = []
+    for relation in relations:
+        skill = await db["KYNANG"].find_one({"_id": relation.get("MaKyNang")})
+        if not skill:
+            continue
+        score = await db["DIEMDANHGIA"].find_one({"MaNganh": role_id, "MaKyNang": skill["_id"], "TrangThai": {"$ne": "inactive"}})
+        if not score:
+            score = await db["DIEMDANHGIA"].find_one({"MaKyNang": skill["_id"], "MaNganh": {"$exists": False}})
+        if not score:
+            continue
+        skills.append(
+            {
+                "skill": skill.get("TenKyNang", ""),
+                "group": skill.get("NhomKyNang") or skill.get("Nhom") or "",
+                "importance": importance_from_score_document(score),
+                "required_score": float(score.get("Diem", 0) or 0),
+                "weight": float(score.get("TrongSo", 0) or 0),
+            }
+        )
+    return skills
 
 
 async def list_career_roles(db: Any) -> list[dict[str, Any]]:
@@ -201,9 +243,10 @@ async def list_career_roles(db: Any) -> list[dict[str, Any]]:
         documents = []
 
     for document in documents:
-        role = normalize_role_document(document)
+        db_skills = await list_role_skills_from_db(db, document["_id"])
+        role = normalize_role_document(document, db_skills or None)
         fallback = roles_by_id.get(role["role_id"], {})
-        role["skills"] = fallback.get("skills", role["skills"])
+        role["skills"] = role["skills"] or fallback.get("skills", [])
         role["icon_label"] = ROLE_ICON_LABELS.get(str(role["role_id"]), "IT")
         roles_by_id[role["role_id"]] = role
 
@@ -673,7 +716,7 @@ def analyze_sections(
         "strengths": strengths,
         "weaknesses": weaknesses[:4],
         "priority_actions": priority_actions,
-        "scoring_config_version": SCORING_CONFIG_VERSION,
+        "scoring_config_version": role.get("scoring_config_version") or SCORING_CONFIG_VERSION,
         "model_version": gpt_review.model_version if gpt_review else "rule-based-local",
         "prompt_version": gpt_review.prompt_version if gpt_review else None,
         "analysis_method": "gpt" if gpt_review else "rule_based",

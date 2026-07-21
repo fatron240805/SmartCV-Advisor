@@ -71,6 +71,58 @@ export interface CareerRole {
   icon_label?: string;
 }
 
+export interface AdminCareerRole extends CareerRole {
+  created_at: string | null;
+  updated_at: string | null;
+  skill_count: number;
+  analysis_count: number;
+  scoring_config_version?: string | null;
+}
+
+export interface AdminSkillConfig {
+  config_id: string;
+  role_id: string;
+  skill_id: string;
+  skill_name: string;
+  skill_group: string;
+  required_score: number;
+  weight: number;
+  importance: 0 | 1 | 2 | 3;
+  importance_label: string;
+  criteria_description: string;
+  status: 'active' | 'inactive';
+  updated_at: string | null;
+}
+
+export interface AdminUserSummary {
+  user_id: string;
+  account_id: string;
+  full_name: string;
+  email: string;
+  phone: string;
+  address: string;
+  account_type: 'registered' | 'premium' | 'admin' | string;
+  role: 'registered' | 'premium' | 'admin' | string;
+  status: 'active' | 'locked';
+  registered_at: string | null;
+  last_login_at: string | null;
+  industry_interest: string;
+  target_role: string;
+  current_level: string;
+  analysis_count: number;
+  lock_reason?: string | null;
+  locked_at?: string | null;
+}
+
+export interface AdminUserDetail extends AdminUserSummary {
+  recent_cvs: Array<{
+    cv_id: string;
+    filename: string;
+    status: string;
+    uploaded_at: string | null;
+  }>;
+}
+
 export interface UploadedCv {
   cv_id: string;
   filename: string;

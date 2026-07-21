@@ -461,15 +461,15 @@ smartcv-advisor/
 
 **Use case:** UC-001, UC-002.
 
-- [ ] CRUD mềm cho Role IT.
-- [ ] Tìm kiếm/lọc Role.
-- [ ] Không cho xóa cứng Role đã có kết quả phân tích.
-- [ ] Quản lý danh sách skill theo Role.
-- [ ] Chỉnh điểm, trọng số, mức quan trọng và mô tả tiêu chí.
-- [ ] Chỉnh sửa hàng loạt.
-- [ ] Validate số dương, giới hạn trọng số và quy tắc tổng trọng số.
-- [ ] Tạo snapshot `scoring_config_version` sau mỗi thay đổi có hiệu lực.
-- [ ] Audit log cho thêm/sửa/ngưng hoạt động.
+- [x] CRUD mềm cho Role IT.
+- [x] Tìm kiếm/lọc Role.
+- [x] Không cho xóa cứng Role đã có kết quả phân tích.
+- [x] Quản lý danh sách skill theo Role.
+- [x] Chỉnh điểm, trọng số, mức quan trọng và mô tả tiêu chí.
+- [x] Chỉnh sửa hàng loạt.
+- [x] Validate số dương, giới hạn trọng số và quy tắc tổng trọng số.
+- [x] Tạo snapshot `scoring_config_version` sau mỗi thay đổi có hiệu lực.
+- [x] Audit log cho thêm/sửa/ngưng hoạt động.
 
 **Tiêu chí hoàn thành**
 
@@ -566,10 +566,10 @@ smartcv-advisor/
 - [ ] Guest được xem plans.
 - [ ] Registered thấy plan hiện tại và CTA nâng cấp.
 - [ ] Premium thấy trạng thái, ngày hết hạn và CTA gia hạn.
-- [ ] Admin xem, tìm kiếm, lọc và phân trang user.
-- [ ] Admin khóa/mở khóa user với lý do và xác nhận.
-- [ ] Force logout khi user bị khóa.
-- [ ] Không cho Admin thường khóa Admin khác.
+- [x] Admin xem, tìm kiếm, lọc và phân trang user.
+- [x] Admin khóa/mở khóa user với lý do và xác nhận.
+- [x] Force logout khi user bị khóa.
+- [x] Không cho Admin thường khóa Admin khác.
 
 **Tiêu chí hoàn thành**
 
@@ -607,9 +607,9 @@ smartcv-advisor/
 
 | Use case | Milestone | Trạng thái |
 |---|---|---|
-| UC-001 Quản lý Role IT | M2 | Chưa bắt đầu |
-| UC-002 Quản lý điểm skill | M2 | Chưa bắt đầu |
-| UC-004 Quản lý người dùng | M6 | Chưa bắt đầu |
+| UC-001 Quản lý Role IT | M2 | Đã triển khai |
+| UC-002 Quản lý điểm skill | M2 | Đã triển khai |
+| UC-004 Quản lý người dùng | M6 | Đã triển khai |
 | UC-008 Đăng ký | M1 | Chưa bắt đầu |
 | UC-009 Đăng nhập | M1 | Chưa bắt đầu |
 | UC-010 Đăng xuất | M1 | Chưa bắt đầu |
@@ -724,4 +724,5 @@ Khi hoàn thành một milestone:
 | 2026-07-16 | AI chỉ trích xuất/nhận xét; backend tính điểm cuối | Tăng tính ổn định, giải thích được và kiểm thử được |
 | 2026-07-16 | Chưa triển khai JD Matching/AI Chat/Roadmap trong core MVP | Bám giới hạn MVP và danh sách use case hiện tại |
 | 2026-07-16 | Bổ sung UC-024 Lịch sử phân tích; Free xem giới hạn, Premium xem toàn bộ | Đồng bộ đặc tả hệ thống bổ sung nhưng không kích hoạt giả các tính năng tương lai |
+| 2026-07-22 | Triển khai Admin UC-001/UC-002/UC-004 bằng API `/api/v1/admin/*` và giao diện Admin riêng | Bám đặc tả Admin, giữ cấu hình Role/Skill version hóa và kiểm tra RBAC ở backend |
 
