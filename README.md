@@ -15,7 +15,6 @@ SmartCV Advisor là MVP web app phân tích CV theo vị trí IT mục tiêu. Lu
 - Node.js + npm
 - MongoDB local hoặc MongoDB Atlas
 - OpenAI API key
-- Tesseract OCR và Poppler nếu muốn đọc ảnh CV hoặc PDF scan
 
 ## Cấu trúc chính
 
@@ -67,14 +66,10 @@ python -m pip install --upgrade pip
 Cài dependency:
 
 ```powershell
-pip install fastapi "uvicorn[standard]" python-multipart python-dotenv openai pymupdf python-docx motor pymongo pillow pytesseract pdf2image
+pip install fastapi "uvicorn[standard]" python-multipart python-dotenv openai pymupdf python-docx motor pymongo
 ```
 
-Để OCR ảnh/PDF scan giống notebook, máy cần có thêm Tesseract và Poppler:
-
-- Tesseract Windows: cài từ bộ cài Tesseract OCR, rồi thêm thư mục cài đặt vào `PATH`.
-- Poppler Windows: tải Poppler, giải nén và thêm thư mục `bin` vào `PATH`.
-- Sau khi thêm `PATH`, đóng/mở lại terminal rồi chạy backend.
+Ảnh CV và PDF scan được đọc trực tiếp bằng GPT image model, nên không cần cài Tesseract hoặc Poppler.
 
 Tạo file `.env` từ mẫu:
 
@@ -105,18 +100,11 @@ OPENAI_API_KEY=your_openai_api_key_here
 OPENAI_MODEL=gpt-4o-mini
 OPENAI_IMAGE_MODEL=gpt-4o-mini
 OPENAI_TIMEOUT_SECONDS=30
-TESSERACT_CMD=
-POPPLER_PATH=
+GPT_OCR_MAX_PDF_PAGES=5
+GPT_OCR_PDF_RENDER_ZOOM=2.0
 ```
 
 Nếu dùng MongoDB Atlas, thay `MONGODB_URI` bằng connection string Atlas. Nếu dùng key từng nằm trong notebook prototype, nên rotate/revoke key cũ rồi dán key mới vào `.env`.
-
-Nếu đã cài OCR nhưng PowerShell vẫn báo không thấy lệnh, điền đường dẫn cụ thể:
-
-```env
-TESSERACT_CMD=C:\Program Files\Tesseract-OCR\tesseract.exe
-POPPLER_PATH=C:\poppler\Library\bin
-```
 
 ## 2. Seed dữ liệu demo
 
@@ -181,21 +169,22 @@ API chính cho luồng CV:
 
 ## 4. Pipeline GPT đang chạy như thế nào
 
-Pipeline backend lấy cảm hứng từ notebook `Pipeline_CV_role_weighted (1).ipynb`, nhưng đã tách thành service production hơn:
+Pipeline backend lấy cảm hứng từ notebook `Pipeline_CV_role_weighted.ipynb`, nhưng đã tách thành service production hơn:
 
 1. `cv_service.py`
    - Validate extension, MIME, signature, dung lượng 5 MB.
    - Đọc text PDF bằng PyMuPDF.
-   - Nếu PDF gần như không có text layer (`<300` ký tự), dùng `pdf2image` + `pytesseract` để OCR giống notebook.
+   - Nếu PDF gần như không có text layer (`<300` ký tự), render các trang đầu bằng PyMuPDF rồi gửi ảnh sang GPT image model để OCR và tách section.
    - Đọc text DOCX bằng `python-docx`.
-   - Đọc ảnh CV PNG/JPG/JPEG/WEBP/BMP bằng GPT image model nếu `OPENAI_API_KEY` đã cấu hình.
-   - Nếu GPT ảnh không khả dụng, fallback sang Pillow + `pytesseract` giống notebook.
-   - Gọi GPT để tách section chuẩn: `Professional Summary`, `Education`, `Experience`, `Projects`, `Technical Skills`, `Certifications`, `Other`.
-   - Nếu không có `OPENAI_API_KEY` hoặc GPT lỗi, fallback sang rule-based section parser.
+   - Đọc ảnh CV PNG/JPG/JPEG/WEBP/BMP trực tiếp bằng GPT image model.
+   - Không dùng OCR cục bộ, không fallback Tesseract/Poppler cho ảnh hoặc PDF scan.
+   - Với PDF text/DOCX, gọi GPT để tách section chuẩn: `Professional Summary`, `Education`, `Experience`, `Projects`, `Technical Skills`, `Certifications`, `Other`.
+   - Nếu không có `OPENAI_API_KEY`, ảnh CV/PDF scan sẽ trả lỗi cấu hình rõ ràng; PDF text/DOCX vẫn có rule-based section parser dự phòng.
 
 2. `gpt_service.py`
    - Đọc `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_IMAGE_MODEL`, `OPENAI_TIMEOUT_SECONDS` từ `.env`.
    - Gọi `client.chat.completions.create(...)` với `response_format={"type": "json_object"}` giống hướng notebook.
+   - Dùng GPT image model cho OCR ảnh CV và PDF scan, sau đó trả `raw_text`, `sections`, `warnings`.
    - Prompt yêu cầu chỉ trả JSON, không markdown, không bịa thông tin ngoài CV.
 
 3. `analysis_service.py`
@@ -261,7 +250,8 @@ npm run lint
 
 `OPENAI_API_KEY` chưa có hoặc sai:
 
-- GPT parser/review sẽ fallback rule-based.
+- PDF text/DOCX vẫn có thể fallback rule-based ở bước tách section.
+- Ảnh CV và PDF scan sẽ không chạy được vì OCR đang dùng GPT image model.
 - Kiểm tra lại `backend/.env`.
 - Restart backend sau khi sửa `.env`.
 
@@ -275,10 +265,10 @@ MongoDB không kết nối được:
 
 Upload ảnh/PDF scan không đọc được:
 
-- Ảnh CV sẽ ưu tiên đọc bằng GPT nếu `OPENAI_API_KEY` hợp lệ.
-- Nếu dùng OCR fallback, kiểm tra đã cài Tesseract OCR và Poppler chưa.
-- Kiểm tra Tesseract/Poppler đã nằm trong `PATH` của terminal chạy backend chưa, hoặc đặt `TESSERACT_CMD` và `POPPLER_PATH` trong `backend/.env`.
-- Mở `http://127.0.0.1:8000/api/health` và kiểm tra `ocr.tesseract.available`, `ocr.poppler.available`, `gpt.configured`.
+- Kiểm tra `OPENAI_API_KEY` trong `backend/.env` đã là key thật và restart backend.
+- Kiểm tra `OPENAI_IMAGE_MODEL` đang là model có khả năng đọc ảnh, ví dụ `gpt-4o-mini`.
+- Mở `http://127.0.0.1:8000/api/health` và kiểm tra `gpt.configured` cùng `ocr.configured`.
+- Với PDF scan dài, chỉnh `GPT_OCR_MAX_PDF_PAGES` nếu cần gửi nhiều trang hơn.
 - Dùng ảnh rõ nét, đủ sáng, không nghiêng nhiều.
 
 Upload DOC cũ bị từ chối:

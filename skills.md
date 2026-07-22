@@ -33,7 +33,7 @@ Trước mọi task, đọc theo thứ tự:
 2. `plan.md`;
 3. `Đặc tả Use Case - MVP (bổ sung)(1).csv`;
 4. `main.pdf`;
-5. `Pipeline_CV_role_weighted(2).ipynb`;
+5. `Pipeline_CV_role_weighted.ipynb`;
 6. các file code hiện tại.
 
 Nếu tài liệu xung đột:
@@ -55,7 +55,7 @@ Nếu tài liệu xung đột:
 | Validation | Pydantic |
 | PDF | PyMuPDF |
 | DOCX | `python-docx` |
-| OCR | Tesseract, chỉ fallback |
+| OCR scan/ảnh CV | GPT image model qua OpenAI API; không dùng OCR cục bộ |
 | AI | qua provider adapter, secret từ environment |
 | Testing frontend | Vitest + React Testing Library; E2E có thể dùng Playwright |
 | Testing backend | Pytest + HTTPX/TestClient |
@@ -331,7 +331,7 @@ Trích xuất nội dung tin cậy mà không làm mất bằng chứng.
 3. mở tệp trong sandbox/process hạn chế;
 4. trích xuất text layer;
 5. đo chất lượng text;
-6. chỉ OCR nếu text quá ít hoặc có dấu hiệu scan;
+6. nếu PDF text quá ít hoặc là ảnh CV, dùng GPT image model để OCR/tách section;
 7. chuẩn hóa nhưng không làm mất công nghệ, URL, email, số liệu và timeline;
 8. trả extraction metadata và warning;
 9. xóa temporary file sau xử lý theo policy.
@@ -342,7 +342,7 @@ Trích xuất nội dung tin cậy mà không làm mất bằng chứng.
 {
   "text": "...",
   "page_count": 2,
-  "method": "pdf_text|ocr|docx",
+  "method": "pdf_text|pdf_gpt_ocr|image_gpt|docx",
   "language_hints": ["vi", "en"],
   "warnings": [],
   "quality_score": 0.93
@@ -351,11 +351,11 @@ Trích xuất nội dung tin cậy mà không làm mất bằng chứng.
 
 ### Không được làm
 
-- chạy OCR cho mọi PDF;
+- chạy GPT OCR cho mọi PDF thay vì ưu tiên text layer sẵn có;
 - tin extension mà không kiểm tra MIME;
 - ghi toàn bộ text CV vào log;
 - giữ file tạm không có cleanup;
-- tự chuyển ảnh thành đầu vào chính khi use case chỉ hỗ trợ PDF/DOC/DOCX.
+- tự chuyển định dạng không được hỗ trợ thành đầu vào chính.
 
 ---
 
@@ -796,7 +796,7 @@ AI coding agent phải đi qua đủ 8 bước. Không được nhảy thẳng v
 - xóa history đồng thời xóa CV gốc mà không có yêu cầu riêng;
 - chỉ ẩn nội dung Premium bằng CSS;
 - ghi raw prompt/response chứa toàn bộ CV vào log;
-- gọi OCR mặc định cho mọi file;
+- gọi GPT OCR mặc định cho mọi file;
 - đưa model name cố định vào nhiều nơi;
 - thay đổi scoring config mà không version;
 - xóa cứng Role có lịch sử;

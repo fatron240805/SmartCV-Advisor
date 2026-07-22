@@ -31,8 +31,6 @@
 
 #############################BÊN DƯỚI LÀ ĐĂNG KHOA CẬP NHẬT VÀO LÚC 1:06PM 19/07/2026
 import os
-import shutil
-from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI
@@ -90,27 +88,6 @@ def home() -> dict[str, str]:
     }
 
 
-def dependency_status(command: str, env_vars: tuple[str, ...]) -> dict[str, Any]:
-    configured_by = None
-    configured_available = False
-    for env_var in env_vars:
-        configured_value = os.getenv(env_var, "").strip().strip('"')
-        if not configured_value:
-            continue
-
-        configured_by = env_var
-        configured_path = Path(configured_value)
-        configured_available = configured_path.exists() or shutil.which(configured_value) is not None
-        break
-
-    path_available = shutil.which(command) is not None
-    return {
-        "available": configured_available or path_available,
-        "configured_by": configured_by,
-        "path_available": path_available,
-    }
-
-
 @app.get("/api/health")
 async def health_check() -> dict[str, Any]:
     database = {"available": True, "name": MONGODB_DB, "error": None}
@@ -123,10 +100,6 @@ async def health_check() -> dict[str, Any]:
             "error": exc.__class__.__name__,
         }
 
-    ocr = {
-        "tesseract": dependency_status("tesseract", ("TESSERACT_CMD",)),
-        "poppler": dependency_status("pdftoppm", ("POPPLER_PATH", "PDF2IMAGE_POPPLER_PATH")),
-    }
     return {
         "status": "ok" if database["available"] else "degraded",
         "database": database,
@@ -135,5 +108,9 @@ async def health_check() -> dict[str, Any]:
             "text_model": OPENAI_MODEL,
             "image_model": OPENAI_IMAGE_MODEL,
         },
-        "ocr": ocr,
+        "ocr": {
+            "provider": "gpt_image_model",
+            "configured": is_gpt_configured(),
+            "image_model": OPENAI_IMAGE_MODEL,
+        },
     }
