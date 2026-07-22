@@ -41,16 +41,15 @@ export default function RegisterPage() {
 
     try {
       setSubmitting(true);
-      const result = await apiService.register({
+      await apiService.register({
         fullName,
         email,
         password,
         passwordConfirmation,
         termsAccepted,
       });
-      const token = result.meta.verification.demo_verification_token ?? '';
-      const search = new URLSearchParams({ email, token });
-      navigate(`/verify-email?${search.toString()}`);
+      const search = new URLSearchParams({ email, registered: '1' });
+      navigate(`/login?${search.toString()}`);
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error));
     } finally {

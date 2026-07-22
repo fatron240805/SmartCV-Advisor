@@ -1,5 +1,16 @@
 import axios from 'axios';
-import type { AnalysisResult, AuthSession, AuthUser, CareerRole, UserProfile, UploadedCv, VerificationMeta } from '../types';
+import type {
+  AdminCareerRole,
+  AdminSkillConfig,
+  AdminUserDetail,
+  AdminUserSummary,
+  AnalysisResult,
+  AuthSession,
+  AuthUser,
+  CareerRole,
+  UserProfile,
+  UploadedCv,
+} from '../types';
 
 const AUTH_STORAGE_KEY = 'smartcv_auth_session';
 
@@ -45,7 +56,7 @@ export const apiService = {
     password: string;
     passwordConfirmation: string;
     termsAccepted: boolean;
-  }): Promise<{ data: AuthUser; meta: { verification: VerificationMeta } }> => {
+  }): Promise<{ data: AuthUser; meta: { next_step: string } }> => {
     const response = await apiClient.post('/auth/register', {
       full_name: payload.fullName,
       email: payload.email,
@@ -53,16 +64,6 @@ export const apiService = {
       password_confirmation: payload.passwordConfirmation,
       terms_accepted: payload.termsAccepted,
     });
-    return response.data;
-  },
-
-  verifyEmail: async (token: string): Promise<{ data: AuthUser }> => {
-    const response = await apiClient.post('/auth/verify-email', { token });
-    return response.data;
-  },
-
-  resendVerification: async (email: string): Promise<{ data: VerificationMeta }> => {
-    const response = await apiClient.post('/auth/resend-verification', { email });
     return response.data;
   },
 
@@ -183,6 +184,139 @@ export const apiService = {
 
   getPlans: async () => {
     const response = await apiClient.get('/service-plans');
+    return response.data;
+  },
+
+  getAdminCareerRoles: async (params?: {
+    search?: string;
+    status?: 'all' | 'active' | 'inactive';
+  }): Promise<{ data: AdminCareerRole[]; meta: { count: number } }> => {
+    const response = await apiClient.get('/admin/career-roles', { params });
+    return response.data;
+  },
+
+  createAdminCareerRole: async (payload: {
+    name: string;
+    description: string;
+    status: 'active' | 'inactive';
+  }): Promise<{ data: AdminCareerRole; meta: { message: string } }> => {
+    const response = await apiClient.post('/admin/career-roles', payload);
+    return response.data;
+  },
+
+  updateAdminCareerRole: async (
+    roleId: string,
+    payload: { name?: string; description?: string; status?: 'active' | 'inactive' },
+  ): Promise<{ data: AdminCareerRole; meta: { message: string } }> => {
+    const response = await apiClient.patch(`/admin/career-roles/${roleId}`, payload);
+    return response.data;
+  },
+
+  updateAdminCareerRoleStatus: async (
+    roleId: string,
+    status: 'active' | 'inactive',
+  ): Promise<{ data: AdminCareerRole; meta: { message: string } }> => {
+    const response = await apiClient.patch(`/admin/career-roles/${roleId}/status`, { status });
+    return response.data;
+  },
+
+  getAdminRoleSkills: async (
+    roleId: string,
+  ): Promise<{ data: AdminSkillConfig[]; meta: { total_weight: number; count: number; role: AdminCareerRole } }> => {
+    const response = await apiClient.get(`/admin/career-roles/${roleId}/skills`);
+    return response.data;
+  },
+
+  createAdminRoleSkill: async (
+    roleId: string,
+    payload: {
+      skill_name: string;
+      skill_group: string;
+      required_score: number;
+      weight: number;
+      importance: number;
+      criteria_description: string;
+    },
+  ): Promise<{ data: AdminSkillConfig; meta: { message: string } }> => {
+    const response = await apiClient.post(`/admin/career-roles/${roleId}/skills`, payload);
+    return response.data;
+  },
+
+  updateAdminRoleSkill: async (
+    roleId: string,
+    configId: string,
+    payload: {
+      required_score?: number;
+      weight?: number;
+      importance?: number;
+      criteria_description?: string;
+      status?: 'active' | 'inactive';
+      skill_group?: string;
+    },
+  ): Promise<{ data: AdminSkillConfig; meta: { message: string } }> => {
+    const response = await apiClient.patch(`/admin/career-roles/${roleId}/skills/${configId}`, payload);
+    return response.data;
+  },
+
+  bulkUpdateAdminRoleSkills: async (
+    roleId: string,
+    payload: {
+      config_ids: string[];
+      required_score?: number;
+      weight?: number;
+      importance?: number;
+      status?: 'active' | 'inactive';
+    },
+  ): Promise<{ data: AdminSkillConfig[]; meta: { message: string } }> => {
+    const response = await apiClient.patch(`/admin/career-roles/${roleId}/skills/bulk`, payload);
+    return response.data;
+  },
+
+  getAdminUsers: async (params?: {
+    search?: string;
+    account_type?: 'all' | 'registered' | 'premium' | 'admin';
+    status?: 'all' | 'active' | 'locked';
+    date_from?: string;
+    date_to?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<{
+    data: AdminUserSummary[];
+    meta: { total: number; page: number; limit: number; has_next: boolean };
+  }> => {
+    const response = await apiClient.get('/admin/users', { params });
+    return response.data;
+  },
+
+  getAdminUser: async (userId: string): Promise<{ data: AdminUserDetail }> => {
+    const response = await apiClient.get(`/admin/users/${userId}`);
+    return response.data;
+  },
+
+  updateAdminUser: async (
+    userId: string,
+    payload: Partial<{
+      full_name: string;
+      email: string;
+      phone: string;
+      address: string;
+      account_type: 'registered' | 'premium' | 'admin';
+      industry_interest: string;
+      target_role: string;
+      current_level: string;
+    }>,
+  ): Promise<{ data: AdminUserSummary; meta: { message: string } }> => {
+    const response = await apiClient.patch(`/admin/users/${userId}`, payload);
+    return response.data;
+  },
+
+  lockAdminUser: async (userId: string, reason: string): Promise<{ data: AdminUserSummary; meta: { message: string } }> => {
+    const response = await apiClient.post(`/admin/users/${userId}/lock`, { reason });
+    return response.data;
+  },
+
+  unlockAdminUser: async (userId: string): Promise<{ data: AdminUserSummary; meta: { message: string } }> => {
+    const response = await apiClient.post(`/admin/users/${userId}/unlock`);
     return response.data;
   },
 };

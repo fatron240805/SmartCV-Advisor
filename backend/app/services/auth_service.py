@@ -25,7 +25,6 @@ REFRESH_TOKEN_DAYS = int(os.getenv("REFRESH_TOKEN_DAYS", "7"))
 REMEMBER_ME_REFRESH_DAYS = int(os.getenv("REMEMBER_ME_REFRESH_DAYS", "30"))
 TEMP_LOCK_MINUTES = int(os.getenv("AUTH_TEMP_LOCK_MINUTES", "15"))
 MAX_FAILED_LOGIN_ATTEMPTS = int(os.getenv("AUTH_MAX_FAILED_LOGIN_ATTEMPTS", "5"))
-EMAIL_TOKEN_MINUTES = int(os.getenv("EMAIL_TOKEN_MINUTES", "30"))
 PASSWORD_RESET_TOKEN_MINUTES = int(os.getenv("PASSWORD_RESET_TOKEN_MINUTES", "30"))
 PASSWORD_HASH_PREFIX = "scrypt"
 
@@ -252,15 +251,13 @@ async def register_user(
         now = utc_now()
         customer_id = f"KH_{uuid4().hex[:10].upper()}"
         account_id = f"TK_{customer_id}"
-        verification_token = secrets.token_urlsafe(32)
-        verification_expires_at = now + timedelta(minutes=EMAIL_TOKEN_MINUTES)
 
         customer = {
             "_id": customer_id,
             "HoTen": clean_name,
             "Email": normalized_email,
             "EmailNormalized": normalized_email,
-            "TrangThai": "Chờ xác thực",
+            "TrangThai": "Hoạt động",
             "LoaiKH": "registered",
             "TrinhDoHV": "",
             "ViTriNN": "",
@@ -276,10 +273,9 @@ async def register_user(
             "MatKhauHash": hash_password(password),
             "MaKH": customer_id,
             "Role": "registered",
-            "TrangThai": "pending_verification",
-            "EmailVerified": False,
-            "VerificationTokenHash": token_hash(verification_token),
-            "VerificationExpiresAt": verification_expires_at,
+            "TrangThai": "active",
+            "EmailVerified": True,
+            "VerifiedAt": now,
             "FailedLoginCount": 0,
             "LockedUntil": None,
             "CreatedAt": now,
@@ -293,7 +289,7 @@ async def register_user(
                 "_id": f"LOG_{account_id}_{uuid4().hex[:8].upper()}",
                 "HanhDong": "Đăng ký tài khoản",
                 "DuLieuTruoc": None,
-                "DuLieuSau": {"Email": normalized_email, "TrangThai": "pending_verification"},
+                "DuLieuSau": {"Email": normalized_email, "TrangThai": "active"},
                 "KetQua": "Thanh cong",
                 "ThoiDiemThucHien": now,
                 "MaKH": customer_id,
@@ -311,112 +307,6 @@ async def register_user(
 
     return {
         "user": public_user(customer, account),
-        "verification": {
-            "email_masked": mask_email(normalized_email),
-            "expires_at": verification_expires_at,
-            "delivery": "mock_email_queued",
-            "demo_verification_token": verification_token,
-        },
-    }
-
-
-async def verify_email(db: Any, token: str) -> dict[str, Any]:
-    token_digest = token_hash(token)
-    try:
-        account = await db["TAIKHOAN"].find_one({"VerificationTokenHash": token_digest})
-        if not account:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"code": "AUTH_VERIFICATION_INVALID", "message": "Liên kết xác thực không hợp lệ hoặc đã hết hạn."},
-            )
-        expires_at = account.get("VerificationExpiresAt")
-        if isinstance(expires_at, datetime) and expires_at < utc_now():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"code": "AUTH_VERIFICATION_EXPIRED", "message": "Liên kết xác thực không hợp lệ hoặc đã hết hạn."},
-            )
-
-        now = utc_now()
-        await db["TAIKHOAN"].update_one(
-            {"_id": account["_id"]},
-            {
-                "$set": {
-                    "TrangThai": "active",
-                    "EmailVerified": True,
-                    "VerifiedAt": now,
-                    "UpdatedAt": now,
-                },
-                "$unset": {"VerificationTokenHash": "", "VerificationExpiresAt": ""},
-            },
-        )
-        if account.get("MaKH"):
-            await db["KHACHHANG"].update_one(
-                {"_id": account["MaKH"]},
-                {"$set": {"TrangThai": "Hoạt động", "NgayCapNhat": now}},
-            )
-
-        updated_account = await db["TAIKHOAN"].find_one({"_id": account["_id"]})
-        customer = await find_customer_for_account(db, updated_account or account)
-    except HTTPException:
-        raise
-    except DATABASE_ERRORS as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={"code": "DATABASE_UNAVAILABLE", "message": "Chưa xác thực được email vì MongoDB chưa sẵn sàng."},
-        ) from exc
-
-    return {"user": public_user(customer, updated_account or account)}
-
-
-async def resend_verification_email(db: Any, email: str) -> dict[str, Any]:
-    normalized_email = normalize_email(email)
-    if not is_valid_email(normalized_email):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"code": "AUTH_EMAIL_INVALID", "message": "Email không đúng định dạng."},
-        )
-
-    try:
-        account = await find_account_by_email(db, normalized_email)
-        if not account:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail={"code": "AUTH_ACCOUNT_NOT_FOUND", "message": "Không tìm thấy tài khoản cần xác thực."},
-            )
-        if account.get("EmailVerified"):
-            return {
-                "email_masked": mask_email(normalized_email),
-                "already_verified": True,
-                "delivery": "not_needed",
-                "demo_verification_token": None,
-            }
-
-        verification_token = secrets.token_urlsafe(32)
-        expires_at = utc_now() + timedelta(minutes=EMAIL_TOKEN_MINUTES)
-        await db["TAIKHOAN"].update_one(
-            {"_id": account["_id"]},
-            {
-                "$set": {
-                    "VerificationTokenHash": token_hash(verification_token),
-                    "VerificationExpiresAt": expires_at,
-                    "UpdatedAt": utc_now(),
-                }
-            },
-        )
-    except HTTPException:
-        raise
-    except DATABASE_ERRORS as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={"code": "DATABASE_UNAVAILABLE", "message": "Chưa gửi lại được email xác thực vì MongoDB chưa sẵn sàng."},
-        ) from exc
-
-    return {
-        "email_masked": mask_email(normalized_email),
-        "already_verified": False,
-        "expires_at": expires_at,
-        "delivery": "mock_email_queued",
-        "demo_verification_token": verification_token,
     }
 
 
@@ -462,24 +352,19 @@ async def login_user(db: Any, *, email: str, password: str, remember_me: bool) -
                 },
             )
 
-        role = account.get("Role") or ("admin" if account.get("MaADM") else "registered")
-        if role != "admin" and not account.get("EmailVerified"):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail={
-                    "code": "AUTH_EMAIL_NOT_VERIFIED",
-                    "message": "Tài khoản của bạn chưa được xác thực. Vui lòng kiểm tra email.",
-                    "email": account.get("Email"),
-                },
-            )
-
         now = utc_now()
+        login_updates: dict[str, Any] = {"FailedLoginCount": 0, "LockedUntil": None, "LastLoginAt": now, "UpdatedAt": now}
+        if not account.get("EmailVerified"):
+            login_updates.update({"EmailVerified": True, "VerifiedAt": now, "TrangThai": "active"})
         await db["TAIKHOAN"].update_one(
             {"_id": account["_id"]},
-            {"$set": {"FailedLoginCount": 0, "LockedUntil": None, "LastLoginAt": now, "UpdatedAt": now}},
+            {"$set": login_updates},
         )
         if account.get("MaKH"):
-            await db["KHACHHANG"].update_one({"_id": account["MaKH"]}, {"$set": {"LanDangNhapCuoi": now}})
+            await db["KHACHHANG"].update_one(
+                {"_id": account["MaKH"]},
+                {"$set": {"LanDangNhapCuoi": now, "TrangThai": "Hoạt động"}},
+            )
 
         fresh_account = await db["TAIKHOAN"].find_one({"_id": account["_id"]}) or account
         return await build_session_response(db, fresh_account, remember_me)

@@ -1,5 +1,8 @@
 import { useState } from 'react';
-import { BrowserRouter, Link, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import AdminCareerRolesPage from './pages/AdminCareerRolesPage';
+import AdminSkillScoresPage from './pages/AdminSkillScoresPage';
+import AdminUsersPage from './pages/AdminUsersPage';
 import AnalysisResultPage from './pages/AnalysisResultPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import HistoryPage from './pages/HistoryPage';
@@ -9,7 +12,6 @@ import RegisterPage from './pages/RegisterPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import LoginPage from './pages/LoginPage';
 import UploadCvPage from './pages/UploadCvPage';
-import VerifyEmailPage from './pages/VerifyEmailPage';
 import { apiService, clearAuthSession, getStoredAuthSession, getStoredAuthUser } from './services/api';
 
 const navigationItems = [
@@ -212,22 +214,40 @@ function AppShell() {
 
 function AppRoutes() {
   const location = useLocation();
+  const storedUser = getStoredAuthUser();
   const authPath = [
     '/login',
     '/register',
-    '/verify-email',
     '/forgot-password',
     '/reset-password',
   ].includes(location.pathname);
+  const adminPath = location.pathname.startsWith('/admin');
 
   if (authPath) {
     return (
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
-        <Route path="/verify-email" element={<VerifyEmailPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
+      </Routes>
+    );
+  }
+
+  if (storedUser?.role === 'admin' || adminPath) {
+    if (storedUser?.role !== 'admin') {
+      return (
+        <Routes>
+          <Route path="*" element={<Navigate replace to="/login" />} />
+        </Routes>
+      );
+    }
+    return (
+      <Routes>
+        <Route path="/admin/roles" element={<AdminCareerRolesPage />} />
+        <Route path="/admin/skills" element={<AdminSkillScoresPage />} />
+        <Route path="/admin/users" element={<AdminUsersPage />} />
+        <Route path="*" element={<Navigate replace to="/admin/roles" />} />
       </Routes>
     );
   }

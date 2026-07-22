@@ -42,7 +42,7 @@ from .services.analysis_service import DATABASE_ERRORS
 from .services.gpt_service import OPENAI_IMAGE_MODEL, OPENAI_MODEL, is_gpt_configured
 
 # 1. Import các router ông vừa viết
-from .routes import analysis, auth, cv, premium, user
+from .routes import admin, analysis, auth, cv, premium, user
 
 DEFAULT_CORS_ORIGINS = [
     "http://localhost:5173",
@@ -77,6 +77,7 @@ app.add_middleware(
 
 # 2. Đăng ký (include) các router này vào app chính
 app.include_router(analysis.router)
+app.include_router(admin.router)
 app.include_router(auth.router)
 app.include_router(cv.router)
 app.include_router(cv.career_role_router)
