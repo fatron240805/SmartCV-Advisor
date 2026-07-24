@@ -19,7 +19,60 @@ OPENAI_IMAGE_MODEL = os.getenv("OPENAI_IMAGE_MODEL", OPENAI_MODEL)
 OPENAI_TIMEOUT_SECONDS = float(os.getenv("OPENAI_TIMEOUT_SECONDS", "30"))
 GPT_SECTION_PROMPT_VERSION = "cv-section-parser-gpt-v1"
 GPT_IMAGE_PROMPT_VERSION = "cv-image-parser-gpt-v1"
-GPT_REVIEW_PROMPT_VERSION = "cv-role-review-gpt-v1"
+GPT_REVIEW_PROMPT_VERSION = "cv-role-review-notebook-rubric-v2"
+
+IMPORTANCE_LABELS = {
+    0: "Không cần có",
+    1: "Nice to have",
+    2: "Quan trọng",
+    3: "Rất quan trọng / bắt buộc",
+}
+
+SECTION_RUBRIC = {
+    "Professional Summary": [
+        "0 điểm nếu thiếu section.",
+        "Tối đa 2 điểm: viết rõ ràng, ngắn gọn, đúng vai trò ứng tuyển.",
+        "Tối đa 3 điểm: nêu được định hướng hoặc chuyên môn liên quan trực tiếp role.",
+        "Tối đa 3 điểm: có nhắc kỹ năng/công nghệ trọng tâm của role.",
+        "Tối đa 2 điểm: có dấu hiệu về impact, kinh nghiệm, hoặc điểm mạnh nổi bật.",
+    ],
+    "Education": [
+        "0 điểm nếu thiếu section.",
+        "Tối đa 4 điểm: có trường, ngành, bậc học, thời gian học rõ ràng.",
+        "Tối đa 3 điểm: coursework/đồ án/môn học liên quan đến role.",
+        "Tối đa 2 điểm: GPA, giải thưởng, học bổng, thành tích học thuật nếu có.",
+        "Tối đa 1 điểm: trình bày dễ đọc, không mơ hồ.",
+    ],
+    "Experience": [
+        "0 điểm nếu thiếu section.",
+        "Tối đa 6 điểm: kinh nghiệm liên quan trực tiếp đến role mục tiêu.",
+        "Tối đa 5 điểm: mô tả trách nhiệm gắn với skill_score quan trọng.",
+        "Tối đa 4 điểm: có kết quả đo lường được, impact, hoặc phạm vi hệ thống.",
+        "Tối đa 3 điểm: thể hiện ownership, seniority, teamwork, hoặc domain context.",
+        "Tối đa 2 điểm: timeline, company, title rõ ràng.",
+    ],
+    "Projects": [
+        "0 điểm nếu thiếu section.",
+        "Tối đa 5 điểm: project liên quan trực tiếp role và skill_score quan trọng.",
+        "Tối đa 4 điểm: có technical depth như architecture, API, model, database, deployment.",
+        "Tối đa 3 điểm: có kết quả, demo, GitHub, metric, user, hoặc deployment.",
+        "Tối đa 3 điểm: nêu rõ vai trò cá nhân, bài toán, và giải pháp.",
+    ],
+    "Technical Skills": [
+        "0 điểm nếu thiếu hoàn toàn bằng chứng kỹ năng.",
+        "Technical Skills là section quan trọng nhất, tối đa 35 điểm.",
+        "Chấm theo skill_scores của role: 3 = bắt buộc, 2 = quan trọng, 1 = nice to have, 0 = không tính điểm.",
+        "Skill_score 3 chiếm 60% điểm Technical Skills, skill_score 2 chiếm 30%, skill_score 1 chiếm 10%.",
+        "Mức bằng chứng cho từng skill: 0 = không thấy; 1 = nhắc mơ hồ; 2 = liệt kê rõ trong skills/cert/course; 3 = có dùng trong project/experience với ngữ cảnh cụ thể.",
+        "Nếu thiếu section Technical Skills nhưng skill xuất hiện ở Experience/Projects, vẫn ghi nhận nhưng điểm Technical Skills tối đa 70%.",
+    ],
+    "Certifications": [
+        "0 điểm nếu thiếu section.",
+        "Tối đa 5 điểm: chứng chỉ/khóa học liên quan trực tiếp role.",
+        "Tối đa 3 điểm: chứng chỉ bù vào skill bắt buộc hoặc quan trọng đang thiếu.",
+        "Tối đa 2 điểm: issuer, thời gian, credential/link rõ ràng và đáng tin.",
+    ],
+}
 
 
 @dataclass(frozen=True)
@@ -309,13 +362,29 @@ def build_role_skill_text(role: dict[str, Any]) -> str:
     lines: list[str] = []
     grouped: dict[str, list[dict[str, Any]]] = {}
     for item in role.get("skills", []):
-        grouped.setdefault(str(item.get("group", "General")), []).append(item)
+        if int(item.get("importance", 0)) > 0:
+            grouped.setdefault(str(item.get("group", "General")), []).append(item)
 
     for group, skills in grouped.items():
         lines.append(f"### {group}")
         for item in sorted(skills, key=lambda value: (-int(value.get("importance", 0)), str(value.get("skill", "")))):
-            lines.append(f"- [{item.get('importance', 0)}] {item.get('skill', '')}")
+            importance = int(item.get("importance", 0))
+            lines.append(f"- [{importance}] {item.get('skill', '')} ({IMPORTANCE_LABELS.get(importance, 'Không cần có')})")
     return "\n".join(lines)
+
+
+def build_section_rubric_text(section_weights: dict[str, int]) -> str:
+    lines: list[str] = []
+    for section, max_score in section_weights.items():
+        lines.append(f"### {section} ({max_score} điểm)")
+        for rule in SECTION_RUBRIC.get(section, []):
+            lines.append(f"- {rule}")
+    return "\n".join(lines)
+
+
+def build_role_roadmap_text(role: dict[str, Any]) -> str:
+    roadmap = str(role.get("roadmap", "")).strip()
+    return roadmap if roadmap else "Chưa có roadmap gốc trong dataset cho role này."
 
 
 def build_sections_text(sections: dict[str, str], section_weights: dict[str, int]) -> str:
@@ -345,23 +414,89 @@ def evaluate_sections_with_gpt(
 Bạn là chuyên gia tuyển dụng IT và reviewer CV.
 Hãy đánh giá CV cho role mục tiêu dựa trên section, bằng chứng trong CV, và skill_score tham chiếu.
 
-Nguyên tắc bắt buộc:
+TRIẾT LÝ CHẤM ĐIỂM:
+- skill_score trong dataset là bản đồ ưu tiên kỹ năng, KHÔNG phải checklist bắt buộc phải có đủ.
+- Một CV thông thường không cần đáp ứng toàn bộ skill trong dataset.
+- Chấm theo mức độ phù hợp thực tế với role, chất lượng bằng chứng, và độ liên quan của kỹ năng quan trọng.
+- Điểm thô của mỗi section có thể vượt max_score nếu CV rất mạnh.
+- Điểm cuối cùng của section phải được cap: final_score = min(raw_score, max_score).
+- Tổng điểm cuối là tổng 6 section, tối đa 100.
+
+NGUYÊN TẮC AN TOÀN:
 - Chỉ dùng thông tin có trong CV; không bịa kỹ năng, công ty, số liệu hoặc thời gian.
-- skill_score là bản đồ ưu tiên kỹ năng, không phải checklist bắt buộc phải có đủ.
-- skill_score 3/2 quan trọng hơn skill_score 1; skill_score 0 không được phạt.
-- Điểm section phải nằm trong max_score tương ứng.
-- Không tạo roadmap, JD matching, keyword gap theo JD, AI chat hoặc nội dung ngoài MVP.
+- Không kết luận người dùng gian dối khi phát hiện mâu thuẫn; chỉ ghi cảnh báo trung lập.
+- Không tạo JD matching, AI chat hoặc nội dung ngoài phạm vi đánh giá CV theo role.
 - Cảnh báo mâu thuẫn phải trung lập, không kết luận người dùng gian dối.
 
 ROLE MỤC TIÊU:
 - Role: {role.get("name")}
 - Description: {role.get("description")}
 
-THANG ĐIỂM SECTION:
-{json.dumps(section_weights, ensure_ascii=False)}
+THANG ĐIỂM HIỂN THỊ:
+- Professional Summary: 10
+- Education: 10
+- Experience: 20
+- Projects: 15
+- Technical Skills: 35
+- Certifications: 10
+Tổng điểm hiển thị tối đa: 100.
+
+RUBRIC SECTION:
+{build_section_rubric_text(section_weights)}
 
 SKILL_SCORE THAM CHIẾU:
 {build_role_skill_text(role)}
+
+QUY TẮC CHẤM TECHNICAL SKILLS:
+1. Không yêu cầu CV phải có tất cả kỹ năng trong dataset.
+2. Ưu tiên đánh giá các kỹ năng có skill_score = 3 và skill_score = 2.
+3. skill_score = 1 chỉ dùng để cộng điểm phụ, không phạt nặng nếu thiếu.
+4. skill_score = 0 không tính điểm và không đưa vào danh sách thiếu.
+5. Với mỗi skill có score 1-3, đánh giá evidence_level:
+   - 0: không thấy trong CV
+   - 1: nhắc mơ hồ, không rõ ngữ cảnh
+   - 2: liệt kê rõ trong Technical Skills / Education / Certifications
+   - 3: được chứng minh trong Experience / Projects với ngữ cảnh cụ thể
+6. Technical Skills chấm theo nguyên tắc:
+   - Nhóm skill_score 3 chiếm trọng số chính.
+   - Nhóm skill_score 2 chiếm trọng số bổ trợ quan trọng.
+   - Nhóm skill_score 1 là điểm cộng thêm.
+   - Không trừ điểm tuyến tính theo số lượng skill thiếu trong toàn dataset.
+   - Nếu CV có ít skill nhưng đều là skill cốt lõi của role và có bằng chứng mạnh, vẫn có thể đạt điểm cao.
+7. Có thể cộng raw_score vượt 35 nếu:
+   - Skill bắt buộc được chứng minh trong project/experience thực tế.
+   - Có impact, metric, deployment, users, scale, hoặc business outcome.
+   - Kỹ năng technical được gắn với vai trò cá nhân rõ ràng.
+   Sau đó final_score vẫn cap về 35.
+
+QUY TẮC CHẤM CÁC SECTION KHÁC:
+- Professional Summary: ưu tiên định vị đúng role, nêu core skills, impact, mục tiêu nghề nghiệp rõ.
+- Education: ưu tiên ngành học, môn học, đồ án, thành tích liên quan role.
+- Experience: ưu tiên trách nhiệm thực tế, impact, công nghệ liên quan skill_score 2-3.
+- Projects: ưu tiên project chứng minh skill quan trọng, có tech stack, vai trò cá nhân, kết quả.
+- Certifications: ưu tiên chứng chỉ/khóa học bù vào skill gap có độ ưu tiên cao.
+
+QUY TẮC ROADMAP:
+Hãy tạo roadmap học tập trực quan theo 4 giai đoạn dựa trên:
+- skill bắt buộc còn thiếu
+- skill quan trọng còn thiếu
+- roadmap gốc trong dataset
+- mức độ hiện tại thể hiện trong CV
+
+Roadmap gốc trong dataset:
+{build_role_roadmap_text(role)}
+
+Roadmap cần có:
+1. Phase 1 - Nền tảng cần củng cố
+2. Phase 2 - Skill chính cho role
+3. Phase 3 - Project thực hành để đưa vào CV
+4. Phase 4 - Deployment / testing / portfolio nếu phù hợp role
+
+Mỗi phase cần có:
+- mục tiêu học
+- kỹ năng cần học
+- output cần tạo ra
+- lý do ưu tiên
 
 CV ĐÃ TÁCH SECTION:
 {build_sections_text(sections, section_weights)}
@@ -370,13 +505,78 @@ Trả về duy nhất JSON hợp lệ, không markdown, theo schema:
 {{
   "section_scores": {{
     "Professional Summary": {{
+      "raw_score": 0,
       "score": 0,
+      "max_score": 10,
+      "comment": "...",
+      "strengths": ["..."],
+      "weaknesses": ["..."],
+      "suggestions": ["..."]
+    }},
+    "Education": {{
+      "raw_score": 0,
+      "score": 0,
+      "max_score": 10,
+      "comment": "...",
+      "strengths": ["..."],
+      "weaknesses": ["..."],
+      "suggestions": ["..."]
+    }},
+    "Experience": {{
+      "raw_score": 0,
+      "score": 0,
+      "max_score": 20,
+      "comment": "...",
+      "strengths": ["..."],
+      "weaknesses": ["..."],
+      "suggestions": ["..."]
+    }},
+    "Projects": {{
+      "raw_score": 0,
+      "score": 0,
+      "max_score": 15,
+      "comment": "...",
+      "strengths": ["..."],
+      "weaknesses": ["..."],
+      "suggestions": ["..."]
+    }},
+    "Technical Skills": {{
+      "raw_score": 0,
+      "score": 0,
+      "max_score": 35,
+      "comment": "...",
+      "strengths": ["..."],
+      "weaknesses": ["..."],
+      "suggestions": ["..."]
+    }},
+    "Certifications": {{
+      "raw_score": 0,
+      "score": 0,
+      "max_score": 10,
       "comment": "...",
       "strengths": ["..."],
       "weaknesses": ["..."],
       "suggestions": ["..."]
     }}
   }},
+  "technical_skill_assessment": {{
+    "core_skills_found": ["..."],
+    "supporting_skills_found": ["..."],
+    "nice_to_have_skills_found": ["..."],
+    "high_priority_missing_skills": ["..."],
+    "medium_priority_missing_skills": ["..."],
+    "nice_to_have_missing_skills": ["..."],
+    "do_not_penalize_missing_skills": ["..."]
+  }},
+  "roadmap_recommendation": [
+    {{
+      "phase": "Phase 1 - Nền tảng cần củng cố",
+      "goal": "...",
+      "skills": ["..."],
+      "output": "...",
+      "reason": "..."
+    }}
+  ],
   "issues": [
     {{
       "criterion": "Nội dung",
@@ -388,6 +588,7 @@ Trả về duy nhất JSON hợp lệ, không markdown, theo schema:
     }}
   ],
   "overall_comment": "...",
+  "readiness_level": "...",
   "priority_actions": ["..."]
 }}
 """

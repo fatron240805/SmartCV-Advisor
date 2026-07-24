@@ -15,7 +15,15 @@ from app.services.gpt_service import evaluate_sections_with_gpt, normalize_list
 from app.services.role_dataset import load_default_roles
 
 
-SCORING_CONFIG_VERSION = "baseline-role-weighted-v1"
+SCORING_CONFIG_VERSION = "notebook-section-roadmap-v3"
+TOTAL_SCORE_SCALE = 1.25
+
+IMPORTANCE_LABELS = {
+    0: "Không cần có",
+    1: "Nice to have",
+    2: "Quan trọng",
+    3: "Rất quan trọng / bắt buộc",
+}
 
 SECTION_WEIGHTS = {
     "Professional Summary": 10,
@@ -300,6 +308,144 @@ def detect_skill_evidence(sections: dict[str, str], role: dict[str, Any]) -> lis
     return assessment
 
 
+def skill_label(item: dict[str, Any]) -> str:
+    group = item.get("group", "General")
+    skill = item.get("skill", "")
+    evidence_sections = item.get("found_sections", [])
+    suffix = f" ({', '.join(evidence_sections)})" if evidence_sections else ""
+    return f"{skill} - {group}{suffix}"
+
+
+def build_technical_skill_assessment(skill_assessment: list[dict[str, Any]]) -> dict[str, list[str]]:
+    def names(*, importance: int, matched: bool | None = None) -> list[str]:
+        items = [item for item in skill_assessment if int(item.get("importance", 0)) == importance]
+        if matched is True:
+            items = [item for item in items if int(item.get("evidence_level", 0)) > 0]
+        elif matched is False:
+            items = [item for item in items if int(item.get("evidence_level", 0)) == 0]
+        return [skill_label(item) for item in items]
+
+    return {
+        "required_skills": names(importance=3),
+        "important_skills": names(importance=2),
+        "nice_to_have_skills": names(importance=1),
+        "not_required_skills": names(importance=0),
+        "matched_required_skills": names(importance=3, matched=True),
+        "matched_important_skills": names(importance=2, matched=True),
+        "matched_nice_to_have_skills": names(importance=1, matched=True),
+        "missing_required_skills": names(importance=3, matched=False),
+        "missing_important_skills": names(importance=2, matched=False),
+        "missing_nice_to_have_skills": names(importance=1, matched=False),
+        "core_skills_found": names(importance=3, matched=True),
+        "supporting_skills_found": names(importance=2, matched=True),
+        "nice_to_have_skills_found": names(importance=1, matched=True),
+        "high_priority_missing_skills": names(importance=3, matched=False),
+        "medium_priority_missing_skills": names(importance=2, matched=False),
+        "nice_to_have_missing_skills": names(importance=1, matched=False),
+        "do_not_penalize_missing_skills": names(importance=0),
+    }
+
+
+def normalize_technical_skill_assessment(
+    gpt_payload: dict[str, Any] | None,
+    fallback: dict[str, list[str]],
+) -> dict[str, list[str]]:
+    if not gpt_payload or not isinstance(gpt_payload.get("technical_skill_assessment"), dict):
+        return fallback
+
+    raw = gpt_payload["technical_skill_assessment"]
+    normalized = {key: list(value) for key, value in fallback.items()}
+    for key in [
+        "core_skills_found",
+        "supporting_skills_found",
+        "nice_to_have_skills_found",
+        "high_priority_missing_skills",
+        "medium_priority_missing_skills",
+        "nice_to_have_missing_skills",
+        "do_not_penalize_missing_skills",
+    ]:
+        values = normalize_list(raw.get(key))
+        if values:
+            normalized[key] = values
+
+    normalized["matched_required_skills"] = normalized["core_skills_found"]
+    normalized["matched_important_skills"] = normalized["supporting_skills_found"]
+    normalized["matched_nice_to_have_skills"] = normalized["nice_to_have_skills_found"]
+    normalized["missing_required_skills"] = normalized["high_priority_missing_skills"]
+    normalized["missing_important_skills"] = normalized["medium_priority_missing_skills"]
+    normalized["missing_nice_to_have_skills"] = normalized["nice_to_have_missing_skills"]
+    return normalized
+
+
+def build_fallback_roadmap(
+    *,
+    role: dict[str, Any],
+    technical_assessment: dict[str, list[str]],
+) -> list[dict[str, Any]]:
+    roadmap_lines = [line.strip() for line in str(role.get("roadmap", "")).splitlines() if line.strip()]
+    required_missing = technical_assessment.get("high_priority_missing_skills", [])[:6]
+    important_missing = technical_assessment.get("medium_priority_missing_skills", [])[:6]
+    nice_missing = technical_assessment.get("nice_to_have_missing_skills", [])[:6]
+
+    return [
+        {
+            "phase": "Phase 1 - Nền tảng cần củng cố",
+            "goal": "Củng cố các nền tảng còn thiếu trước khi mở rộng sang kỹ năng chuyên sâu.",
+            "skills": required_missing[:3] or roadmap_lines[:2],
+            "output": "Một bản CV cập nhật có section Technical Skills rõ ràng và bằng chứng nền tảng.",
+            "reason": "Các kỹ năng bắt buộc ảnh hưởng trực tiếp tới điểm phù hợp role.",
+        },
+        {
+            "phase": "Phase 2 - Skill chính cho role",
+            "goal": "Tập trung vào kỹ năng quan trọng có tác động cao tới role mục tiêu.",
+            "skills": important_missing[:4] or roadmap_lines[2:4],
+            "output": "Một project hoặc mô tả kinh nghiệm thể hiện rõ kỹ năng score 2-3.",
+            "reason": "Kỹ năng quan trọng nên được chứng minh bằng ngữ cảnh sử dụng thực tế.",
+        },
+        {
+            "phase": "Phase 3 - Project thực hành để đưa vào CV",
+            "goal": "Tạo bằng chứng có thể đưa vào Projects hoặc Experience.",
+            "skills": [*required_missing[:2], *important_missing[:2]] or roadmap_lines[4:6],
+            "output": "Project có tech stack, vai trò cá nhân, kết quả và link demo/GitHub nếu có.",
+            "reason": "Bằng chứng trong project giúp tăng điểm Technical Skills, Projects và Experience.",
+        },
+        {
+            "phase": "Phase 4 - Deployment / testing / portfolio",
+            "goal": "Hoàn thiện độ tin cậy và khả năng trình bày với nhà tuyển dụng.",
+            "skills": nice_missing[:4] or roadmap_lines[6:8],
+            "output": "Portfolio/deployment/test case hoặc tài liệu ngắn mô tả impact dự án.",
+            "reason": "Các yếu tố triển khai, kiểm thử và portfolio giúp CV nổi bật hơn khi ứng tuyển.",
+        },
+    ]
+
+
+def normalize_roadmap_recommendation(
+    gpt_payload: dict[str, Any] | None,
+    fallback: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    if not gpt_payload or not isinstance(gpt_payload.get("roadmap_recommendation"), list):
+        return fallback
+
+    roadmap: list[dict[str, Any]] = []
+    for item in gpt_payload["roadmap_recommendation"][:6]:
+        if not isinstance(item, dict):
+            continue
+        phase = str(item.get("phase", "")).strip()
+        goal = str(item.get("goal", "")).strip()
+        if not phase or not goal:
+            continue
+        roadmap.append(
+            {
+                "phase": phase,
+                "goal": goal,
+                "skills": normalize_list(item.get("skills")),
+                "output": str(item.get("output", "")).strip(),
+                "reason": str(item.get("reason", "")).strip(),
+            }
+        )
+    return roadmap or fallback
+
+
 def score_section_presence(sections: dict[str, str]) -> dict[str, dict[str, Any]]:
     section_scores: dict[str, dict[str, Any]] = {}
 
@@ -324,10 +470,14 @@ def score_section_presence(sections: dict[str, str]) -> dict[str, dict[str, Any]
 
         section_scores[section] = {
             "section": section,
+            "raw_score": round(score, 1),
             "score": round(min(max_score, score), 1),
             "max_score": max_score,
             "word_count": words,
             "comment": comment,
+            "strengths": [],
+            "weaknesses": [comment] if score < max_score else [],
+            "suggestions": [],
         }
 
     return section_scores
@@ -354,8 +504,14 @@ def apply_gpt_section_scores(
             score = float(raw_info.get("score", normalized[section]["score"]))
         except (TypeError, ValueError):
             score = normalized[section]["score"]
+        try:
+            raw_score = float(raw_info.get("raw_score", score))
+        except (TypeError, ValueError):
+            raw_score = score
 
+        normalized[section]["raw_score"] = round(max(0, raw_score), 1)
         normalized[section]["score"] = round(max(0, min(max_score, score)), 1)
+        normalized[section]["max_score"] = int(raw_info.get("max_score") or max_score)
         normalized[section]["comment"] = raw_info.get("comment") or normalized[section]["comment"]
         normalized[section]["strengths"] = normalize_list(raw_info.get("strengths"))
         normalized[section]["weaknesses"] = normalize_list(raw_info.get("weaknesses"))
@@ -645,6 +801,7 @@ def analyze_sections(
     extraction = cv.get("Extraction", {})
     sections = extraction.get("sections") or {section: "" for section in STANDARD_SECTIONS}
     skill_assessment = detect_skill_evidence(sections, role)
+    local_technical_assessment = build_technical_skill_assessment(skill_assessment)
     section_scores = score_section_presence(sections)
     gpt_review = evaluate_sections_with_gpt(
         sections=sections,
@@ -660,17 +817,19 @@ def analyze_sections(
         extension=cv.get("Loai", ""),
         extraction=extraction,
     )
-    weighted_total = round(
-        criteria_scores[0]["score"] * 0.2
-        + criteria_scores[1]["score"] * 0.25
-        + criteria_scores[2]["score"] * 0.25
-        + criteria_scores[3]["score"] * 0.15
-        + criteria_scores[4]["score"] * 0.15
-    )
-    classification, summary = classify_score(int(weighted_total))
+    section_total = int(round(sum(float(item["score"]) for item in section_scores.values())))
+    section_total = max(0, min(100, section_total))
+    total_score = int(round(section_total * TOTAL_SCORE_SCALE))
+    total_score = max(0, min(100, total_score))
+    classification, summary = classify_score(total_score)
     if gpt_payload and isinstance(gpt_payload.get("overall_comment"), str) and gpt_payload["overall_comment"].strip():
         summary = gpt_payload["overall_comment"].strip()
 
+    technical_assessment = normalize_technical_skill_assessment(gpt_payload, local_technical_assessment)
+    roadmap_recommendation = normalize_roadmap_recommendation(
+        gpt_payload,
+        build_fallback_roadmap(role=role, technical_assessment=technical_assessment),
+    )
     issues = normalize_gpt_issues(gpt_payload) or build_issues(
         sections=sections,
         skill_assessment=skill_assessment,
@@ -685,18 +844,26 @@ def analyze_sections(
         for issue in issues
         if issue.get("severity") in {"high", "medium"}
     ]
+    readiness_level = None
+    if gpt_payload and isinstance(gpt_payload.get("readiness_level"), str):
+        readiness_level = gpt_payload["readiness_level"].strip()
+    if not readiness_level:
+        readiness_level = classification
 
     return {
-        "total_score": int(weighted_total),
+        "total_score": total_score,
         "classification": classification,
         "summary": summary,
         "criteria_scores": criteria_scores,
         "section_scores": list(section_scores.values()),
         "skill_assessment": skill_assessment,
+        "technical_skill_assessment": technical_assessment,
+        "roadmap_recommendation": roadmap_recommendation,
         "issues": issues,
         "strengths": strengths,
         "weaknesses": weaknesses[:4],
         "priority_actions": priority_actions,
+        "readiness_level": readiness_level,
         "scoring_config_version": SCORING_CONFIG_VERSION,
         "model_version": gpt_review.model_version if gpt_review else "rule-based-local",
         "prompt_version": gpt_review.prompt_version if gpt_review else None,
@@ -734,6 +901,7 @@ async def create_analysis_for_cv(
     now = datetime.now(timezone.utc)
     analysis_id = f"KQ_{uuid4().hex[:10].upper()}"
     criteria_map = {item["key"]: item["score"] for item in analysis["criteria_scores"]}
+    section_map = {item["section"]: item["score"] for item in analysis["section_scores"]}
 
     result_document = {
         "_id": analysis_id,
@@ -748,13 +916,22 @@ async def create_analysis_for_cv(
         "DiemTuKhoa": criteria_map.get("keywords"),
         "DiemVanPhong": criteria_map.get("style"),
         "DiemATS": criteria_map.get("ats"),
+        "DiemPhanGT": section_map.get("Professional Summary"),
+        "DiemTDHV": section_map.get("Education"),
+        "DiemKNLV": section_map.get("Experience"),
+        "DiemDoAn": section_map.get("Projects"),
+        "DiemTechSkill": section_map.get("Technical Skills"),
+        "DiemCert": section_map.get("Certifications"),
         "CriteriaScores": analysis["criteria_scores"],
         "SectionScores": analysis["section_scores"],
         "SkillAssessment": analysis["skill_assessment"],
+        "TechnicalSkillAssessment": analysis["technical_skill_assessment"],
+        "RoadmapRecommendation": analysis["roadmap_recommendation"],
         "Issues": analysis["issues"],
         "Strengths": analysis["strengths"],
         "Weaknesses": analysis["weaknesses"],
         "PriorityActions": analysis["priority_actions"],
+        "ReadinessLevel": analysis["readiness_level"],
         "ScoringConfigVersion": analysis["scoring_config_version"],
         "ModelVersion": analysis["model_version"],
         "PromptVersion": analysis["prompt_version"],
@@ -853,6 +1030,45 @@ def legacy_issues(result: dict[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
+def legacy_technical_skill_assessment(result: dict[str, Any]) -> dict[str, list[str]]:
+    if isinstance(result.get("TechnicalSkillAssessment"), dict):
+        return result["TechnicalSkillAssessment"]
+    skill_assessment = result.get("SkillAssessment")
+    if isinstance(skill_assessment, list):
+        return build_technical_skill_assessment(skill_assessment)
+    return {
+        "required_skills": [],
+        "important_skills": [],
+        "nice_to_have_skills": [],
+        "not_required_skills": [],
+        "matched_required_skills": [],
+        "matched_important_skills": [],
+        "matched_nice_to_have_skills": [],
+        "missing_required_skills": [],
+        "missing_important_skills": [],
+        "missing_nice_to_have_skills": [],
+        "core_skills_found": [],
+        "supporting_skills_found": [],
+        "nice_to_have_skills_found": [],
+        "high_priority_missing_skills": [],
+        "medium_priority_missing_skills": [],
+        "nice_to_have_missing_skills": [],
+        "do_not_penalize_missing_skills": [],
+    }
+
+
+def legacy_roadmap_recommendation(
+    result: dict[str, Any],
+    role: dict[str, Any] | None,
+    technical_assessment: dict[str, list[str]],
+) -> list[dict[str, Any]]:
+    if isinstance(result.get("RoadmapRecommendation"), list):
+        return result["RoadmapRecommendation"]
+    if role:
+        return build_fallback_roadmap(role=role, technical_assessment=technical_assessment)
+    return []
+
+
 def format_analysis_result(
     result: dict[str, Any],
     cv: dict[str, Any],
@@ -866,6 +1082,7 @@ def format_analysis_result(
         summary = summary or fallback_summary
 
     created_at = result.get("ThoiDiemPT")
+    technical_assessment = legacy_technical_skill_assessment(result)
     return {
         "analysis_id": result.get("_id"),
         "cv_id": cv.get("_id"),
@@ -882,6 +1099,10 @@ def format_analysis_result(
         "summary": summary,
         "criteria_scores": legacy_criteria_scores(result),
         "section_scores": legacy_section_scores(result),
+        "skill_assessment": result.get("SkillAssessment") or [],
+        "technical_skill_assessment": technical_assessment,
+        "roadmap_recommendation": legacy_roadmap_recommendation(result, role, technical_assessment),
+        "readiness_level": result.get("ReadinessLevel") or classification,
         "issues": legacy_issues(result),
         "strengths": result.get("Strengths") or [],
         "weaknesses": result.get("Weaknesses") or [],

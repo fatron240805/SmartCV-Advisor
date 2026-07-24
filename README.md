@@ -193,9 +193,11 @@ Pipeline backend lấy cảm hứng từ notebook `Pipeline_CV_role_weighted.ipy
    - Prompt yêu cầu chỉ trả JSON, không markdown, không bịa thông tin ngoài CV.
 
 3. `analysis_service.py`
-   - Gọi GPT review section theo role/skill score.
+   - Gọi GPT review section theo role/skill score bằng rubric dài tương tự notebook.
    - Danh sách role và `skill_score` lấy từ dataset `backend/app/data/it_role_skill_score_dataset.json`.
-   - Backend vẫn normalize/cap điểm theo 0-100 và lưu `scoring_config_version`.
+   - Tổng điểm lấy từ 6 section: `Professional Summary`, `Education`, `Experience`, `Projects`, `Technical Skills`, `Certifications`.
+   - Trả thêm `technical_skill_assessment` theo nhóm bắt buộc/quan trọng/nice-to-have và `roadmap_recommendation`.
+   - Backend vẫn normalize/cap điểm section theo tổng 100 và lưu `scoring_config_version`.
    - Nếu GPT lỗi, fallback rule-based scoring để demo không bị dừng.
    - Lưu metadata: `ModelVersion`, `PromptVersion`, `AnalysisMethod`.
 
