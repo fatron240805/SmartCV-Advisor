@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { apiService, getApiErrorMessage } from '../services/api';
-import type { AnalysisIssue, AnalysisResult, CriteriaScore } from '../types';
+import type { AnalysisIssue, AnalysisResult, SectionScore } from '../types';
 
 const tabs = [
   { key: 'overview', label: 'Tổng quan' },
-  { key: 'layout', label: 'Bố cục' },
-  { key: 'content', label: 'Nội dung' },
-  { key: 'keywords', label: 'Từ khóa' },
-  { key: 'style', label: 'Văn phong' },
-  { key: 'ats', label: 'ATS' },
+  { key: 'Professional Summary', label: 'Giới thiệu' },
+  { key: 'Education', label: 'Học vấn' },
+  { key: 'Experience', label: 'Kinh nghiệm' },
+  { key: 'Projects', label: 'Dự án' },
+  { key: 'Technical Skills', label: 'Kỹ năng' },
+  { key: 'Certifications', label: 'Chứng chỉ' },
 ];
 
 function ScoreDonut({ score }: { score: number }) {
@@ -29,24 +30,26 @@ function ScoreDonut({ score }: { score: number }) {
   );
 }
 
-function scoreBarColor(score: CriteriaScore) {
-  if (score.color === 'green') return 'bg-green-600';
-  if (score.color === 'orange') return 'bg-amber-500';
+function scoreBarColor(score: number) {
+  if (score >= 78) return 'bg-green-600';
+  if (score >= 65) return 'bg-amber-500';
   return 'bg-blue-600';
 }
 
-function CriteriaBar({ item }: { item: CriteriaScore }) {
+function SectionScoreBar({ item }: { item: SectionScore }) {
+  const percentage = item.max_score > 0 ? Math.round((item.score / item.max_score) * 100) : 0;
   return (
     <div>
       <div className="mb-2 flex items-center justify-between text-sm">
-        <span className="font-medium text-slate-600">{item.label}</span>
-        <span className={item.score >= 78 ? 'font-bold text-green-600' : item.score >= 65 ? 'font-bold text-amber-600' : 'font-bold text-blue-600'}>
-          {item.score}
+        <span className="font-medium text-slate-600">{item.section}</span>
+        <span className={percentage >= 78 ? 'font-bold text-green-600' : percentage >= 65 ? 'font-bold text-amber-600' : 'font-bold text-blue-600'}>
+          {item.score}/{item.max_score}
         </span>
       </div>
       <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-        <div className={`h-full rounded-full ${scoreBarColor(item)}`} style={{ width: `${item.score}%` }} />
+        <div className={`h-full rounded-full ${scoreBarColor(percentage)}`} style={{ width: `${percentage}%` }} />
       </div>
+      <p className="mt-2 text-xs leading-5 text-slate-500">{item.comment}</p>
     </div>
   );
 }
@@ -92,6 +95,26 @@ function IssueCard({ issue }: { issue: AnalysisIssue }) {
   );
 }
 
+function SkillList({ title, items, tone = 'slate' }: { title: string; items: string[]; tone?: 'green' | 'amber' | 'blue' | 'slate' }) {
+  const toneClass = {
+    green: 'border-green-100 bg-green-50 text-green-700',
+    amber: 'border-amber-100 bg-amber-50 text-amber-700',
+    blue: 'border-blue-100 bg-blue-50 text-blue-700',
+    slate: 'border-slate-200 bg-slate-50 text-slate-700',
+  }[tone];
+
+  return (
+    <div className={`rounded-2xl border p-5 ${toneClass}`}>
+      <h3 className="font-bold">{title}</h3>
+      <ul className="mt-3 space-y-2 text-sm leading-6">
+        {(items.length ? items : ['Chưa phát hiện dữ liệu rõ ràng.']).slice(0, 8).map((item) => (
+          <li key={item}>• {item}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export default function AnalysisResultPage() {
   const { id } = useParams<{ id: string }>();
   const [result, setResult] = useState<AnalysisResult | null>(null);
@@ -119,12 +142,7 @@ export default function AnalysisResultPage() {
   const visibleIssues = useMemo(() => {
     if (!result) return [];
     if (activeTab === 'overview') return result.issues;
-    const tabLabel = tabs.find((tab) => tab.key === activeTab)?.label;
-    if (!tabLabel) return result.issues;
-    if (activeTab === 'ats') {
-      return result.issues.filter((issue) => issue.criterion === 'ATS' || issue.criterion === 'Độ tương thích ATS');
-    }
-    return result.issues.filter((issue) => issue.criterion === tabLabel);
+    return result.issues.filter((issue) => issue.criterion === activeTab);
   }, [activeTab, result]);
 
   if (loading) {
@@ -154,6 +172,7 @@ export default function AnalysisResultPage() {
   const formattedDate = result.created_at
     ? new Date(result.created_at).toLocaleDateString('vi-VN')
     : 'Chưa có ngày';
+  const activeSectionScore = result.section_scores.find((section) => section.section === activeTab);
 
   return (
     <main className="mx-auto w-full max-w-6xl px-6 py-8">
@@ -179,15 +198,17 @@ export default function AnalysisResultPage() {
           </div>
           <div className="mt-7 text-center">
             <p className="text-2xl font-bold text-blue-600">{result.classification}</p>
+            <p className="mt-1 text-sm font-semibold text-slate-500">Mức sẵn sàng: {result.readiness_level}</p>
             <p className="mx-auto mt-3 max-w-xs leading-6 text-slate-500">{result.summary}</p>
           </div>
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-          <h2 className="text-xl font-bold text-slate-950">Điểm 5 tiêu chí</h2>
+          <h2 className="text-xl font-bold text-slate-950">Điểm 6 section</h2>
+          <p className="mt-2 text-sm text-slate-500">Tổng điểm được tính bằng tổng điểm các section, tối đa 100.</p>
           <div className="mt-6 space-y-5">
-            {result.criteria_scores.map((score) => (
-              <CriteriaBar key={score.key} item={score} />
+            {result.section_scores.map((score) => (
+              <SectionScoreBar key={score.section} item={score} />
             ))}
           </div>
         </div>
@@ -214,25 +235,91 @@ export default function AnalysisResultPage() {
 
         <div className="p-6">
           {activeTab === 'overview' && (
-            <div className="mb-6 grid gap-4 md:grid-cols-2">
-              <div className="rounded-2xl bg-slate-50 p-5">
-                <h2 className="font-bold text-slate-900">Điểm mạnh</h2>
-                <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-600">
-                  {(result.strengths.length ? result.strengths : ['CV đã có dữ liệu đủ để tạo đánh giá tổng quan.']).map((item) => (
-                    <li key={item}>✓ {item}</li>
-                  ))}
-                </ul>
+            <div className="mb-6 space-y-6">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-2xl bg-slate-50 p-5">
+                  <h2 className="font-bold text-slate-900">Điểm mạnh</h2>
+                  <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-600">
+                    {(result.strengths.length ? result.strengths : ['CV đã có dữ liệu đủ để tạo đánh giá tổng quan.']).map((item) => (
+                      <li key={item}>✓ {item}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="rounded-2xl bg-blue-50 p-5">
+                  <h2 className="font-bold text-slate-900">Hành động ưu tiên</h2>
+                  <ol className="mt-3 space-y-2 text-sm leading-6 text-slate-600">
+                    {result.priority_actions.map((item, index) => (
+                      <li key={item}>
+                        {index + 1}. {item}
+                      </li>
+                    ))}
+                  </ol>
+                </div>
               </div>
-              <div className="rounded-2xl bg-blue-50 p-5">
-                <h2 className="font-bold text-slate-900">Hành động ưu tiên</h2>
-                <ol className="mt-3 space-y-2 text-sm leading-6 text-slate-600">
-                  {result.priority_actions.map((item, index) => (
-                    <li key={item}>
-                      {index + 1}. {item}
-                    </li>
-                  ))}
-                </ol>
+
+              <div>
+                <h2 className="text-xl font-bold text-slate-950">Technical Skill Assessment</h2>
+                <div className="mt-4 grid gap-4 lg:grid-cols-3">
+                  <SkillList title="Bắt buộc đã có" items={result.technical_skill_assessment.matched_required_skills} tone="green" />
+                  <SkillList title="Bắt buộc còn thiếu" items={result.technical_skill_assessment.missing_required_skills} tone="amber" />
+                  <SkillList title="Quan trọng đã có" items={result.technical_skill_assessment.matched_important_skills} tone="blue" />
+                  <SkillList title="Quan trọng còn thiếu" items={result.technical_skill_assessment.missing_important_skills} tone="amber" />
+                  <SkillList title="Nice-to-have đã có" items={result.technical_skill_assessment.matched_nice_to_have_skills} tone="slate" />
+                  <SkillList title="Nice-to-have còn thiếu" items={result.technical_skill_assessment.missing_nice_to_have_skills} tone="slate" />
+                </div>
               </div>
+
+              <div>
+                <h2 className="text-xl font-bold text-slate-950">Roadmap Recommendation</h2>
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  {result.roadmap_recommendation.map((phase) => (
+                    <article key={phase.phase} className="rounded-2xl border border-slate-200 bg-white p-5">
+                      <h3 className="font-bold text-slate-900">{phase.phase}</h3>
+                      <p className="mt-2 text-sm leading-6 text-slate-600">{phase.goal}</p>
+                      {phase.skills.length > 0 && (
+                        <p className="mt-3 text-sm text-slate-500">
+                          <span className="font-semibold text-slate-700">Kỹ năng: </span>
+                          {phase.skills.join(', ')}
+                        </p>
+                      )}
+                      {phase.output && <p className="mt-2 text-sm text-blue-700">Output: {phase.output}</p>}
+                      {phase.reason && <p className="mt-2 text-xs leading-5 text-slate-500">{phase.reason}</p>}
+                    </article>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab !== 'overview' && activeSectionScore && (
+            <div className="mb-6 rounded-2xl border border-blue-100 bg-blue-50 p-5">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <h2 className="font-bold text-blue-700">{activeSectionScore.section}</h2>
+                <span className="font-bold text-blue-700">
+                  {activeSectionScore.score}/{activeSectionScore.max_score}
+                </span>
+              </div>
+              <p className="mt-2 text-sm leading-6 text-blue-700">{activeSectionScore.comment}</p>
+              {(activeSectionScore.strengths?.length || activeSectionScore.suggestions?.length) && (
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <div>
+                    <h3 className="text-sm font-bold text-blue-700">Điểm mạnh</h3>
+                    <ul className="mt-2 space-y-1 text-sm text-blue-700">
+                      {(activeSectionScore.strengths ?? []).map((item) => (
+                        <li key={item}>✓ {item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-blue-700">Gợi ý</h3>
+                    <ul className="mt-2 space-y-1 text-sm text-blue-700">
+                      {(activeSectionScore.suggestions ?? []).map((item) => (
+                        <li key={item}>• {item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

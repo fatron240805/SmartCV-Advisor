@@ -14,11 +14,34 @@ from zipfile import BadZipFile
 
 from fastapi import HTTPException, UploadFile, status
 
-from app.services.gpt_service import parse_cv_image_with_gpt, parse_cv_sections_with_gpt
+from app.services.gpt_service import (
+    is_gpt_configured,
+    parse_cv_image_with_gpt,
+    parse_cv_images_with_gpt,
+    parse_cv_sections_with_gpt,
+)
 
 
 MAX_CV_SIZE_BYTES = 5 * 1024 * 1024
 CONSENT_POLICY_VERSION = "cv-processing-policy-v1"
+
+
+def get_positive_int_env(name: str, default: int) -> int:
+    try:
+        return max(1, int(os.getenv(name, str(default))))
+    except (TypeError, ValueError):
+        return default
+
+
+def get_positive_float_env(name: str, default: float) -> float:
+    try:
+        return max(1.0, float(os.getenv(name, str(default))))
+    except (TypeError, ValueError):
+        return default
+
+
+GPT_OCR_MAX_PDF_PAGES = get_positive_int_env("GPT_OCR_MAX_PDF_PAGES", 5)
+GPT_OCR_PDF_RENDER_ZOOM = get_positive_float_env("GPT_OCR_PDF_RENDER_ZOOM", 2.0)
 SUPPORTED_EXTENSIONS = {".pdf", ".doc", ".docx"}
 SUPPORTED_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
 SUPPORTED_MIME_TYPES = {
@@ -128,16 +151,6 @@ def resolve_image_mime_type(extension: str, content_type: str | None) -> str:
     return IMAGE_MIME_TYPES_BY_EXTENSION.get(extension, "image/png")
 
 
-def configure_tesseract(pytesseract: Any) -> None:
-    tesseract_cmd = os.getenv("TESSERACT_CMD", "").strip()
-    if tesseract_cmd:
-        pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
-
-
-def get_poppler_path() -> str | None:
-    return os.getenv("POPPLER_PATH", "").strip() or os.getenv("PDF2IMAGE_POPPLER_PATH", "").strip() or None
-
-
 @dataclass(frozen=True)
 class ExtractionResult:
     text: str
@@ -146,6 +159,9 @@ class ExtractionResult:
     language_hints: list[str]
     warnings: list[str]
     quality_score: float
+    sections: dict[str, str] | None = None
+    section_parser_model: str | None = None
+    section_parser_prompt_version: str | None = None
 
 
 def normalize_text(text: str) -> str:
@@ -320,7 +336,7 @@ def validate_upload_metadata(file: UploadFile, content: bytes, consent_accepted:
     return extension
 
 
-def extract_pdf_text(content: bytes) -> ExtractionResult:
+def extract_pdf_text(content: bytes, user_id: str) -> ExtractionResult:
     try:
         import fitz
     except ImportError as exc:
@@ -349,11 +365,7 @@ def extract_pdf_text(content: bytes) -> ExtractionResult:
     warnings: list[str] = []
 
     if len(text) < 300:
-        ocr_result = extract_pdf_text_with_ocr(content, page_count)
-        if ocr_result.text:
-            return ocr_result
-
-        warnings.append("PDF có rất ít text layer và OCR fallback chưa đọc được đủ nội dung.")
+        return extract_pdf_scan_with_gpt(document, user_id=user_id)
 
     return ExtractionResult(
         text=text,
@@ -365,57 +377,71 @@ def extract_pdf_text(content: bytes) -> ExtractionResult:
     )
 
 
-def extract_pdf_text_with_ocr(content: bytes, page_count: int | None) -> ExtractionResult:
-    try:
-        from pdf2image import convert_from_bytes
-        import pytesseract
-    except ImportError:
-        return ExtractionResult(
-            text="",
-            page_count=page_count,
-            method="ocr",
-            language_hints=["unknown"],
-            warnings=[
-                "PDF có dấu hiệu là bản scan nhưng máy chủ chưa cài pdf2image/pytesseract để OCR."
-            ],
-            quality_score=0.0,
+def extract_pdf_scan_with_gpt(document: Any, *, user_id: str) -> ExtractionResult:
+    if not is_gpt_configured():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "code": "CV_GPT_OCR_UNAVAILABLE",
+                "message": "PDF scan cần GPT image model để đọc nội dung. Vui lòng cấu hình OPENAI_API_KEY trong backend/.env.",
+            },
         )
 
+    page_count = document.page_count
+    page_limit = min(page_count, GPT_OCR_MAX_PDF_PAGES)
+    images: list[dict[str, bytes | str]] = []
     try:
-        configure_tesseract(pytesseract)
-        images = convert_from_bytes(content, dpi=200, poppler_path=get_poppler_path())
-        page_texts = [pytesseract.image_to_string(image) for image in images]
-    except pytesseract.TesseractNotFoundError:
-        return ExtractionResult(
-            text="",
-            page_count=page_count,
-            method="ocr_unavailable",
-            language_hints=["unknown"],
-            warnings=[
-                "PDF scan cần Tesseract OCR nhưng backend chưa tìm thấy tesseract trong PATH hoặc TESSERACT_CMD."
-            ],
-            quality_score=0.0,
-        )
-    except Exception:
-        return ExtractionResult(
-            text="",
-            page_count=page_count,
-            method="ocr_unavailable",
-            language_hints=["unknown"],
-            warnings=[
-                "OCR fallback cho PDF scan chưa đọc được nội dung. Kiểm tra Poppler/Tesseract và biến POPPLER_PATH/TESSERACT_CMD."
-            ],
-            quality_score=0.0,
+        import fitz
+
+        matrix = fitz.Matrix(GPT_OCR_PDF_RENDER_ZOOM, GPT_OCR_PDF_RENDER_ZOOM)
+        for page_index in range(page_limit):
+            page = document.load_page(page_index)
+            pixmap = page.get_pixmap(matrix=matrix, alpha=False)
+            images.append(
+                {
+                    "content": pixmap.tobytes("png"),
+                    "mime_type": "image/png",
+                    "label": f"Trang {page_index + 1}",
+                }
+            )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "CV_PDF_SCAN_RENDER_FAILED",
+                "message": "PDF scan không thể render thành ảnh để GPT đọc nội dung.",
+            },
+        ) from exc
+
+    gpt_extraction = parse_cv_images_with_gpt(
+        images=images,
+        user_id=user_id,
+        standard_sections=STANDARD_SECTIONS,
+    )
+    if not gpt_extraction:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "CV_GPT_OCR_NOT_READABLE",
+                "message": "GPT chưa đọc được đủ nội dung từ PDF scan. Vui lòng thử CV rõ nét hơn hoặc PDF có text layer.",
+            },
         )
 
-    text = normalize_text("\n".join(page_texts))
+    text = normalize_text(gpt_extraction.raw_text)
+    warnings = ["PDF scan được render thành ảnh và đọc trực tiếp bằng GPT image model."]
+    if page_count > page_limit:
+        warnings.append(f"Hệ thống chỉ gửi {page_limit}/{page_count} trang đầu tiên cho GPT OCR để bảo vệ thời gian xử lý.")
+    warnings.extend(gpt_extraction.warnings)
     return ExtractionResult(
         text=text,
-        page_count=page_count or len(images),
-        method="ocr",
+        page_count=page_count,
+        method="pdf_gpt_ocr",
         language_hints=detect_language_hints(text),
-        warnings=["PDF có ít text layer nên hệ thống đã dùng OCR fallback."],
-        quality_score=0.82 if len(text) >= 300 else 0.45,
+        warnings=warnings,
+        quality_score=0.88 if len(text) >= 300 else 0.55,
+        sections=gpt_extraction.sections,
+        section_parser_model=gpt_extraction.model_version,
+        section_parser_prompt_version=gpt_extraction.prompt_version,
     )
 
 
@@ -459,6 +485,15 @@ def extract_docx_text(content: bytes) -> ExtractionResult:
 
 
 def extract_image_text(extension: str, content: bytes, content_type: str | None, user_id: str) -> ExtractionResult:
+    if not is_gpt_configured():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "code": "CV_GPT_IMAGE_OCR_UNAVAILABLE",
+                "message": "Ảnh CV cần GPT image model để đọc nội dung. Vui lòng cấu hình OPENAI_API_KEY trong backend/.env.",
+            },
+        )
+
     gpt_extraction = parse_cv_image_with_gpt(
         content=content,
         mime_type=resolve_image_mime_type(extension, content_type),
@@ -475,57 +510,23 @@ def extract_image_text(extension: str, content: bytes, content_type: str | None,
             language_hints=detect_language_hints(gpt_extraction.raw_text),
             warnings=warnings,
             quality_score=0.88 if len(gpt_extraction.raw_text) >= 300 else 0.55,
+            sections=gpt_extraction.sections,
+            section_parser_model=gpt_extraction.model_version,
+            section_parser_prompt_version=gpt_extraction.prompt_version,
         )
 
-    try:
-        from PIL import Image
-        import pytesseract
-    except ImportError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={
-                "code": "CV_IMAGE_OCR_UNAVAILABLE",
-                "message": "Chưa đọc được ảnh CV vì GPT ảnh chưa khả dụng và máy chủ chưa cài Pillow/pytesseract.",
-                "hint": "Điền OPENAI_API_KEY trong backend/.env hoặc cài Pillow/pytesseract kèm Tesseract OCR.",
-            },
-        ) from exc
-
-    try:
-        configure_tesseract(pytesseract)
-        image = Image.open(BytesIO(content))
-        image.load()
-        text = normalize_text(pytesseract.image_to_string(image))
-    except pytesseract.TesseractNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={
-                "code": "CV_IMAGE_OCR_UNAVAILABLE",
-                "message": "Chưa đọc được ảnh CV vì backend chưa tìm thấy Tesseract OCR.",
-                "hint": "Cài Tesseract OCR rồi thêm vào PATH, hoặc đặt TESSERACT_CMD trong backend/.env, hoặc dùng OPENAI_API_KEY để GPT đọc ảnh.",
-            },
-        ) from exc
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "code": "CV_IMAGE_UNREADABLE",
-                "message": "Ảnh CV có thể bị hỏng hoặc OCR không đọc được nội dung.",
-            },
-        ) from exc
-
-    return ExtractionResult(
-        text=text,
-        page_count=1,
-        method="image_ocr",
-        language_hints=detect_language_hints(text),
-        warnings=["Ảnh CV được đọc bằng OCR cục bộ trước khi gửi nội dung text sang GPT."],
-        quality_score=0.82 if len(text) >= 300 else 0.45,
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail={
+            "code": "CV_GPT_IMAGE_NOT_READABLE",
+            "message": "GPT chưa đọc được đủ nội dung từ ảnh CV. Vui lòng thử ảnh rõ nét hơn.",
+        },
     )
 
 
 def extract_cv_text(extension: str, content: bytes, content_type: str | None, user_id: str) -> ExtractionResult:
     if extension == ".pdf":
-        extraction = extract_pdf_text(content)
+        extraction = extract_pdf_text(content, user_id=user_id)
     elif extension == ".docx":
         extraction = extract_docx_text(content)
     elif extension in SUPPORTED_IMAGE_EXTENSIONS:
@@ -606,21 +607,28 @@ async def build_cv_document(
 ) -> dict[str, Any]:
     extension = validate_upload_metadata(file, content, consent_accepted)
     extraction = extract_cv_text(extension, content, file.content_type, user_id)
-    gpt_sections = parse_cv_sections_with_gpt(
-        raw_text=extraction.text,
-        user_id=user_id,
-        standard_sections=STANDARD_SECTIONS,
-    )
-    if gpt_sections:
-        sections = gpt_sections.sections
-        section_parser = "gpt"
-        section_parser_model = gpt_sections.model_version
-        section_parser_prompt_version = gpt_sections.prompt_version
+
+    if extraction.sections and any(value.strip() for value in extraction.sections.values()):
+        sections = extraction.sections
+        section_parser = "gpt_image" if extraction.method == "image_gpt" else "gpt_ocr"
+        section_parser_model = extraction.section_parser_model
+        section_parser_prompt_version = extraction.section_parser_prompt_version
     else:
-        sections = parse_sections(extraction.text)
-        section_parser = "rule_based"
-        section_parser_model = None
-        section_parser_prompt_version = None
+        gpt_sections = parse_cv_sections_with_gpt(
+            raw_text=extraction.text,
+            user_id=user_id,
+            standard_sections=STANDARD_SECTIONS,
+        )
+        if gpt_sections:
+            sections = gpt_sections.sections
+            section_parser = "gpt"
+            section_parser_model = gpt_sections.model_version
+            section_parser_prompt_version = gpt_sections.prompt_version
+        else:
+            sections = parse_sections(extraction.text)
+            section_parser = "rule_based"
+            section_parser_model = None
+            section_parser_prompt_version = None
     now = datetime.now(timezone.utc)
     cv_id = f"CV_{uuid4().hex[:10].upper()}"
     filename = file.filename or f"uploaded-cv{extension}"

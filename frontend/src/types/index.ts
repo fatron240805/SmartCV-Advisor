@@ -151,10 +151,51 @@ export interface CriteriaScore {
 
 export interface SectionScore {
   section: string;
+  raw_score?: number;
   score: number;
   max_score: number;
   word_count: number | null;
   comment: string;
+  strengths?: string[];
+  weaknesses?: string[];
+  suggestions?: string[];
+}
+
+export interface SkillEvidence {
+  skill: string;
+  group: string;
+  importance: number;
+  evidence_level: number;
+  found_sections: string[];
+  status: 'matched' | 'missing' | string;
+}
+
+export interface TechnicalSkillAssessment {
+  required_skills: string[];
+  important_skills: string[];
+  nice_to_have_skills: string[];
+  not_required_skills: string[];
+  matched_required_skills: string[];
+  matched_important_skills: string[];
+  matched_nice_to_have_skills: string[];
+  missing_required_skills: string[];
+  missing_important_skills: string[];
+  missing_nice_to_have_skills: string[];
+  core_skills_found: string[];
+  supporting_skills_found: string[];
+  nice_to_have_skills_found: string[];
+  high_priority_missing_skills: string[];
+  medium_priority_missing_skills: string[];
+  nice_to_have_missing_skills: string[];
+  do_not_penalize_missing_skills: string[];
+}
+
+export interface RoadmapPhase {
+  phase: string;
+  goal: string;
+  skills: string[];
+  output: string;
+  reason: string;
 }
 
 export interface AnalysisIssue {
@@ -183,6 +224,10 @@ export interface AnalysisResult {
   summary: string;
   criteria_scores: CriteriaScore[];
   section_scores: SectionScore[];
+  skill_assessment: SkillEvidence[];
+  technical_skill_assessment: TechnicalSkillAssessment;
+  roadmap_recommendation: RoadmapPhase[];
+  readiness_level: string;
   issues: AnalysisIssue[];
   strengths: string[];
   weaknesses: string[];

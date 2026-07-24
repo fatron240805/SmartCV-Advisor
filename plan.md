@@ -29,7 +29,7 @@ Khi có mâu thuẫn giữa các tài liệu, áp dụng thứ tự sau:
 
 1. **`Đặc tả Use Case - MVP (bổ sung)(1).csv`** — nguồn sự thật chính cho hành vi hệ thống, actor, luồng, business rule và NFR hiện tại.
 2. **`main.pdf`** — nguồn sự thật cho tầm nhìn sản phẩm, khách hàng, giới hạn MVP và định hướng bảo mật dữ liệu CV.
-3. **`Pipeline_CV_role_weighted(2).ipynb`** — prototype tham khảo cho pipeline trích xuất, chuẩn hóa section, role-weighted scoring và gợi ý.
+3. **`Pipeline_CV_role_weighted.ipynb`** — prototype tham khảo cho pipeline trích xuất, chuẩn hóa section, role-weighted scoring và gợi ý.
 4. **`N7_Agents.md`** — mẫu phương pháp tổ chức tài liệu, quy tắc làm việc và quy trình phát triển theo từng bước.
 5. **Quyết định kỹ thuật mới nhất của dự án** — được ghi trực tiếp trong tài liệu này và có quyền thay thế giả định cũ trong báo cáo.
 
@@ -44,7 +44,7 @@ Khi có mâu thuẫn giữa các tài liệu, áp dụng thứ tự sau:
 | AI integration | API AI qua adapter, cấu hình bằng biến môi trường |
 | Xử lý PDF | PyMuPDF |
 | Xử lý DOCX | `python-docx` |
-| OCR fallback | Tesseract, chỉ dùng khi PDF gần như không có text layer |
+| OCR scan/ảnh CV | GPT image model qua OpenAI API; không dùng OCR cục bộ |
 | Validation | Pydantic |
 | Authentication | JWT access token ngắn hạn + refresh token có kiểm soát |
 | Deployment | Frontend trên Vercel; backend trên Render hoặc nền tảng tương đương; MongoDB Atlas |
@@ -154,15 +154,16 @@ FastAPI Backend
 ### 5.1. Các bước xử lý
 
 1. **Upload validation**
-   - chỉ nhận `.pdf`, `.doc`, `.docx`;
+   - chỉ nhận `.pdf`, `.doc`, `.docx` và ảnh CV `.png`, `.jpg`, `.jpeg`, `.webp`, `.bmp`;
    - tối đa 5 MB cho Registered User;
    - kiểm tra MIME type, extension, file signature và khả năng đọc;
    - ghi nhận consent trước khi lưu/xử lý.
 
 2. **Document extraction**
    - PDF có text layer: PyMuPDF;
-   - PDF scan: OCR fallback nếu lượng text trích xuất dưới ngưỡng cấu hình;
+   - PDF scan: render trang bằng PyMuPDF và dùng GPT image model qua OpenAI API để OCR/tách section;
    - DOCX: `python-docx`;
+   - ảnh CV: dùng GPT image model qua OpenAI API để OCR/tách section;
    - `.doc`: chuyển đổi qua dịch vụ/tiện ích an toàn hoặc từ chối có hướng dẫn nếu môi trường không hỗ trợ ổn định.
 
 3. **Text normalization**
@@ -507,7 +508,7 @@ smartcv-advisor/
 
 - [ ] Trích xuất PDF text layer.
 - [ ] Trích xuất DOCX.
-- [ ] OCR fallback cho PDF scan khi cần.
+- [ ] GPT image OCR cho PDF scan và ảnh CV.
 - [ ] Chuẩn hóa 7 section.
 - [ ] Structured output bằng Pydantic schema.
 - [ ] Evidence extraction cho skill, project, impact và timeline.
@@ -677,7 +678,7 @@ Bộ test tối thiểu cần có:
 | AI trả JSON sai schema | Cao | structured output, Pydantic validation, retry/fallback |
 | Điểm số không ổn định | Cao | backend deterministic scoring, config versioning |
 | AI bịa thông tin CV | Cao | evidence-only prompt, kiểm tra mọi gợi ý dựa trên source text |
-| OCR sai | Trung bình | chỉ OCR khi cần, hiển thị cảnh báo confidence thấp |
+| GPT OCR sai | Trung bình | chỉ dùng GPT OCR khi PDF thiếu text layer hoặc input là ảnh CV, hiển thị cảnh báo confidence thấp |
 | File chứa dữ liệu cá nhân | Cao | consent, RBAC, retention, delete request, log tối thiểu |
 | Chi phí AI tăng | Trung bình | giới hạn lượt, cache kết quả, model adapter, token budget |
 | Người dùng hiểu điểm AI là quyết định tuyển dụng | Cao | disclaimer rõ ràng, giải thích tiêu chí và giới hạn |
