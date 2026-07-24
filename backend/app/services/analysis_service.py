@@ -896,6 +896,10 @@ DEFAULT_FREE_PLAN_ID = "DV_FREE"
 DEFAULT_PREMIUM_PLAN_ID = "DV_PREMIUM_30"
 
 
+def can_view_premium_roadmap(current_plan: str | None) -> bool:
+    return str(current_plan or "").lower() == "premium"
+
+
 async def resolve_quota_state(db: Any, user_id: str, now: datetime) -> dict[str, Any]:
     """Đọc (và nếu cần, tự làm mới) trạng thái gói dịch vụ hiện tại của user.
 
@@ -1019,6 +1023,7 @@ async def create_analysis_for_cv(
     cv_id: str,
     role_id: str,
     user_id: str,
+    current_plan: str | None = None,
 ) -> dict[str, Any]:
     try:
         cv = await db["CV"].find_one({"_id": cv_id, "MaKH": user_id})
@@ -1040,6 +1045,7 @@ async def create_analysis_for_cv(
     role = await get_role_by_id(db, role_id)
     canonical_role_id = role["role_id"]
     analysis = analyze_sections(cv=cv, role=role)
+    can_view_roadmap = can_view_premium_roadmap(current_plan)
     now = datetime.now(timezone.utc)
     analysis_id = f"KQ_{uuid4().hex[:10].upper()}"
     criteria_map = {item["key"]: item["score"] for item in analysis["criteria_scores"]}
@@ -1068,7 +1074,7 @@ async def create_analysis_for_cv(
         "SectionScores": analysis["section_scores"],
         "SkillAssessment": analysis["skill_assessment"],
         "TechnicalSkillAssessment": analysis["technical_skill_assessment"],
-        "RoadmapRecommendation": analysis["roadmap_recommendation"],
+        "RoadmapRecommendation": analysis["roadmap_recommendation"] if can_view_roadmap else [],
         "Issues": analysis["issues"],
         "Strengths": analysis["strengths"],
         "Weaknesses": analysis["weaknesses"],
@@ -1107,7 +1113,7 @@ async def create_analysis_for_cv(
         ) from exc
 
     updated_cv = {**cv, "TrangThai": "completed", "MaNganh": canonical_role_id}
-    return format_analysis_result(result_document, updated_cv, role)
+    return format_analysis_result(result_document, updated_cv, role, can_view_roadmap=can_view_roadmap)
 
 
 def legacy_criteria_scores(result: dict[str, Any]) -> list[dict[str, Any]]:
@@ -1223,6 +1229,8 @@ def format_analysis_result(
     result: dict[str, Any],
     cv: dict[str, Any],
     role: dict[str, Any] | None,
+    *,
+    can_view_roadmap: bool = True,
 ) -> dict[str, Any]:
     total_score = int(result.get("DiemTongQuan", 0) or 0)
     classification = result.get("XepLoai")
@@ -1251,7 +1259,7 @@ def format_analysis_result(
         "section_scores": legacy_section_scores(result),
         "skill_assessment": result.get("SkillAssessment") or [],
         "technical_skill_assessment": technical_assessment,
-        "roadmap_recommendation": legacy_roadmap_recommendation(result, role, technical_assessment),
+        "roadmap_recommendation": legacy_roadmap_recommendation(result, role, technical_assessment) if can_view_roadmap else [],
         "readiness_level": result.get("ReadinessLevel") or classification,
         "issues": legacy_issues(result),
         "strengths": result.get("Strengths") or [],
@@ -1275,14 +1283,16 @@ async def get_analysis_detail(
     db: Any,
     analysis_id: str,
     user_id: str,
+    current_plan: str | None = None,
 ) -> dict[str, Any]:
+    can_view_roadmap = can_view_premium_roadmap(current_plan)
     try:
         result = await db["KETQUA_PTCV"].find_one({"_id": analysis_id})
     except DATABASE_ERRORS as exc:
         if analysis_id == "KQ001" and user_id == "KH001":
             demo_role_id = LEGACY_ROLE_ID_ALIASES.get("NG_FRONTEND", "NG_FRONTEND")
             role = next((role for role in DEFAULT_ROLES if role["role_id"] == demo_role_id), DEFAULT_ROLES[0])
-            return format_analysis_result(DEMO_RESULT, DEMO_CV, role)
+            return format_analysis_result(DEMO_RESULT, DEMO_CV, role, can_view_roadmap=can_view_roadmap)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={
@@ -1312,4 +1322,4 @@ async def get_analysis_detail(
         except HTTPException:
             role = None
 
-    return format_analysis_result(result, cv, role)
+    return format_analysis_result(result, cv, role, can_view_roadmap=can_view_roadmap)

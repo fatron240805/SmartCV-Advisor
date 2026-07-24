@@ -404,7 +404,7 @@ export default function LandingPage() {
                   '3 lượt phân tích',
                   'Điểm tổng quan & điểm thành phần',
                   'Danh sách lỗi phổ biến',
-                  'Gợi ý cải thiện tổng quan',
+                  'Gợi ý cải thiện tổng quan, không kèm roadmap',
                 ].map((f) => (
                   <li key={f} className="flex items-center gap-2.5">
                     <svg viewBox="0 0 20 20" className="h-4 w-4 shrink-0 text-emerald-500" fill="currentColor" aria-hidden="true">
@@ -439,6 +439,7 @@ export default function LandingPage() {
                 {[
                   'Không giới hạn lượt phân tích',
                   'Gợi ý chi tiết theo từng lỗi',
+                  'Roadmap sau khi đánh giá CV',
                   'Câu mẫu viết lại theo STAR',
                   'Sao chép nhanh',
                   'Tất cả quyền lợi Free',

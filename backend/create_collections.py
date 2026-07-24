@@ -161,7 +161,7 @@ async def main():
                         "HanSuDung": 30,
                         "QuyenLoi": (
                             "3 lượt phân tích; xem điểm tổng quan; "
-                            "xem lỗi phổ biến và gợi ý cải thiện tổng quan."
+                            "xem lỗi phổ biến và gợi ý cải thiện tổng quan không kèm roadmap."
                         ),
                         "NgayTao": now,
                         "NgayCapNhat": None,
@@ -175,6 +175,7 @@ async def main():
                         "HanSuDung": 30,
                         "QuyenLoi": (
                             "Phân tích CV nâng cao; xem gợi ý chi tiết; "
+                            "xem roadmap sau khi đánh giá CV; "
                             "xem câu mẫu viết lại và sao chép nhanh."
                         ),
                         "NgayTao": now,
@@ -189,6 +190,7 @@ async def main():
                         "HanSuDung": 90,
                         "QuyenLoi": (
                             "Phân tích CV nâng cao; xem gợi ý chi tiết; "
+                            "xem roadmap sau khi đánh giá CV; "
                             "xem câu mẫu viết lại và sao chép nhanh."
                         ),
                         "NgayTao": now,

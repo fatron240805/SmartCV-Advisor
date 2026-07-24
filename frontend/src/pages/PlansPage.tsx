@@ -299,7 +299,8 @@ function CancelModal({ onConfirm, onCancel, loading, error }: {
 }
 
 // ─────────────────────── Plan Cards ───────────────────────
-const PREMIUM_FEATURES = ['Không giới hạn lượt phân tích', 'Gợi ý chi tiết chuyên sâu', 'Câu mẫu viết lại theo STAR', 'Sao chép nhanh từng câu mẫu', 'Tất cả quyền lợi Free'];
+const FREE_FEATURES = ['3 lượt phân tích', 'Điểm tổng quan và 5 tiêu chí', 'Danh sách lỗi phổ biến', 'Gợi ý cải thiện tổng quan, không kèm roadmap', 'Lịch sử phân tích'];
+const PREMIUM_FEATURES = ['Không giới hạn lượt phân tích', 'Gợi ý chi tiết chuyên sâu', 'Roadmap sau khi đánh giá CV', 'Câu mẫu viết lại theo STAR', 'Sao chép nhanh từng câu mẫu', 'Tất cả quyền lợi Free'];
 const getCS = (c: '30' | '90') => [c === '30' ? 'Matching Score với JD (10 lượt)' : 'Matching Score với JD (20 lượt)', c === '30' ? 'AI Assistant (20 lượt)' : 'AI Assistant (40 lượt)', 'Tải xuống CV đã chỉnh sửa'];
 
 function FreeCard() {
@@ -310,7 +311,7 @@ function FreeCard() {
       <div className="mt-4"><span className="text-5xl font-extrabold tracking-tight text-slate-900">đ0</span></div>
       <p className="mt-2 text-sm font-medium text-slate-400">Mãi mãi miễn phí</p>
       <ul className="mb-8 mt-8 flex-1 space-y-4 text-sm font-medium text-slate-700">
-        {['3 lượt phân tích', 'Điểm tổng quan và 5 tiêu chí', 'Danh sách lỗi phổ biến', 'Gợi ý cải thiện tổng quan', 'Lịch sử phân tích'].map((f, i) => (
+        {FREE_FEATURES.map((f, i) => (
           <li key={i} className="flex items-start gap-3"><CheckIcon /><span>{f}</span></li>
         ))}
       </ul>
@@ -368,7 +369,6 @@ function UpgradePremiumCard({ cycle, recommended, onUpgrade }: { cycle: '30' | '
 
 // ─────────────────────── Main Page ───────────────────────
 export default function PlansPage() {
-  const [billingCycle, setBillingCycle] = useState<'30' | '90'>('30');
   const [quota, setQuota] = useState<QuotaData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [payAction, setPayAction] = useState<PlanAction>(null);

@@ -269,7 +269,8 @@ export default function AnalysisResultPage() {
                 </div>
               </div>
 
-              <div>
+              {result.roadmap_recommendation.length > 0 && (
+                <div>
                 <h2 className="text-xl font-bold text-slate-950">Roadmap Recommendation</h2>
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                   {result.roadmap_recommendation.map((phase) => (
@@ -287,7 +288,8 @@ export default function AnalysisResultPage() {
                     </article>
                   ))}
                 </div>
-              </div>
+                </div>
+              )}
             </div>
           )}
 
