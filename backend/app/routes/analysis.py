@@ -125,6 +125,7 @@ async def get_analysis_result(analysis_id: str, user: dict = Depends(get_current
         db=db,
         analysis_id=analysis_id,
         user_id=user["user_id"],
+        current_plan=user.get("current_plan"),
     )
     if not detail.get("role_name") and detail.get("role_id"):
         try:

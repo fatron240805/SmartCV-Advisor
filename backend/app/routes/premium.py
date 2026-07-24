@@ -11,6 +11,30 @@ from app.db import db
 
 router = APIRouter(prefix="/api/v1/service-plans", tags=["Plans"])
 
+FREE_ROADMAP_NOTE = "Gợi ý cải thiện tổng quan, không kèm roadmap"
+PREMIUM_ROADMAP_FEATURE = "Roadmap sau khi đánh giá CV"
+
+
+def normalize_plan_features(plan_id: str, features: list[str]) -> list[str]:
+    cleaned: list[str] = []
+    for feature in features:
+        normalized = feature.strip()
+        if not normalized:
+            continue
+        lower_feature = normalized.lower()
+        if plan_id == "DV_FREE" and "gợi ý cải thiện tổng quan" in lower_feature:
+            if "lỗi phổ biến" in lower_feature and "Danh sách lỗi phổ biến" not in cleaned:
+                cleaned.append("Danh sách lỗi phổ biến")
+            continue
+        cleaned.append(normalized)
+
+    if plan_id == "DV_FREE" and FREE_ROADMAP_NOTE not in cleaned:
+        cleaned.append(FREE_ROADMAP_NOTE)
+    if plan_id.startswith("DV_PREMIUM") and PREMIUM_ROADMAP_FEATURE not in cleaned:
+        insert_at = 2 if len(cleaned) >= 2 else len(cleaned)
+        cleaned.insert(insert_at, PREMIUM_ROADMAP_FEATURE)
+    return cleaned
+
 
 PLANS = [
     {
@@ -23,7 +47,7 @@ PLANS = [
             "3 lượt phân tích",
             "Điểm tổng quan và 5 tiêu chí",
             "Danh sách lỗi phổ biến",
-            "Gợi ý cải thiện tổng quan",
+            FREE_ROADMAP_NOTE,
             "Lịch sử phân tích",
         ],
         "coming_soon": [],
@@ -37,6 +61,7 @@ PLANS = [
         "features": [
             "Không giới hạn lượt phân tích",
             "Gợi ý chi tiết chuyên sâu",
+            PREMIUM_ROADMAP_FEATURE,
             "Câu mẫu viết lại theo STAR",
             "Sao chép nhanh từng câu mẫu",
             "Tất cả quyền lợi Free",
@@ -50,12 +75,13 @@ PLANS = [
     {
         "plan_id": "DV_PREMIUM_90",
         "name": "Premium — Job Search Pass",
-        "price": 499000,
+        "price": 389000,
         "duration_days": 90,
         "analysis_limit": 30,
         "features": [
             "Không giới hạn lượt phân tích",
             "Gợi ý chi tiết chuyên sâu",
+            PREMIUM_ROADMAP_FEATURE,
             "Câu mẫu viết lại theo STAR",
             "Sao chép nhanh từng câu mẫu",
             "Tất cả quyền lợi Free",
@@ -93,7 +119,10 @@ async def get_service_plans() -> dict[str, Any]:
                     "price": int(price),
                     "duration_days": plan.get("HanSuDung"),
                     "analysis_limit": plan.get("SoLuotPhanTich"),
-                    "features": [f.strip() for f in (plan.get("QuyenLoi") or "").split(";") if f.strip()],
+                    "features": normalize_plan_features(
+                        plan_id,
+                        [f.strip() for f in (plan.get("QuyenLoi") or "").split(";") if f.strip()],
+                    ),
                     "coming_soon": [],
                 }
             )
@@ -112,7 +141,7 @@ async def get_service_plans() -> dict[str, Any]:
                     "3 lượt phân tích",
                     "Điểm tổng quan và 5 tiêu chí",
                     "Danh sách lỗi phổ biến",
-                    "Gợi ý cải thiện tổng quan",
+                    FREE_ROADMAP_NOTE,
                     "Lịch sử phân tích",
                 ],
                 "coming_soon": [],
@@ -126,6 +155,7 @@ async def get_service_plans() -> dict[str, Any]:
                 "features": [
                     "Không giới hạn lượt phân tích",
                     "Gợi ý chi tiết chuyên sâu",
+                    PREMIUM_ROADMAP_FEATURE,
                     "Câu mẫu viết lại theo STAR",
                     "Sao chép nhanh từng câu mẫu",
                     "Tất cả quyền lợi Free",
@@ -139,12 +169,13 @@ async def get_service_plans() -> dict[str, Any]:
             {
                 "plan_id": "DV_PREMIUM_90",
                 "name": "Premium — Job Search Pass",
-                "price": 499000,
+                "price": 389000,
                 "duration_days": 90,
                 "analysis_limit": 30,
                 "features": [
                     "Không giới hạn lượt phân tích",
                     "Gợi ý chi tiết chuyên sâu",
+                    PREMIUM_ROADMAP_FEATURE,
                     "Câu mẫu viết lại theo STAR",
                     "Sao chép nhanh từng câu mẫu",
                     "Tất cả quyền lợi Free",

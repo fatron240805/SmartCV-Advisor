@@ -122,6 +122,7 @@ async def create_analysis(
         cv_id=cv_id,
         role_id=payload.career_role_id,
         user_id=user["user_id"],
+        current_plan=user.get("current_plan"),
     )
     return {
         "data": result,

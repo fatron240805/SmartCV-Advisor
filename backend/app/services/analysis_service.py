@@ -220,6 +220,7 @@ def normalize_role_document(document: dict[str, Any], skills: list[dict[str, Any
 
 async def list_career_roles(db: Any) -> list[dict[str, Any]]:
     roles_by_id = {role["role_id"]: role for role in DEFAULT_ROLES}
+    merged_roles = {role_id: dict(role) for role_id, role in roles_by_id.items()}
 
     try:
         cursor = db["NGANHNGHIET"].find({}).sort("TenNganh", 1)
@@ -227,21 +228,38 @@ async def list_career_roles(db: Any) -> list[dict[str, Any]]:
     except Exception:
         documents = []
 
-    # Nếu DB trống → dùng DEFAULT_ROLES làm fallback toàn bộ
-    if not documents:
-        return [dict(role) for role in DEFAULT_ROLES]
+    canonical_document_ids = {
+        str(document.get("_id") or document.get("role_id"))
+        for document in documents
+        if str(document.get("_id") or document.get("role_id")) in roles_by_id
+    }
 
-    # Nếu DB có dữ liệu → chỉ trả về roles từ DB
-    # (skills được bổ sung từ DEFAULT_ROLES nếu DB chưa có)
-    db_roles: list[dict[str, Any]] = []
     for document in documents:
         role = normalize_role_document(document)
-        fallback = roles_by_id.get(role["role_id"], {})
-        role["skills"] = fallback.get("skills", role["skills"])
-        role["icon_label"] = ROLE_ICON_LABELS.get(str(role["role_id"]), "IT")
-        db_roles.append(role)
+        original_role_id = str(role["role_id"])
+        canonical_role_id = LEGACY_ROLE_ID_ALIASES.get(original_role_id, original_role_id)
+        fallback = roles_by_id.get(canonical_role_id)
 
-    return sorted(db_roles, key=lambda item: item["name"])
+        if original_role_id != canonical_role_id and canonical_role_id in canonical_document_ids:
+            continue
+
+        if fallback:
+            merged_role = dict(fallback)
+            merged_role["role_id"] = canonical_role_id
+            merged_role["status"] = role["status"]
+            if original_role_id == canonical_role_id:
+                merged_role["name"] = role["name"] or fallback["name"]
+                merged_role["description"] = role["description"] or fallback["description"]
+                merged_role["skills"] = role["skills"] or fallback.get("skills", [])
+            merged_role["icon_label"] = ROLE_ICON_LABELS.get(canonical_role_id, fallback.get("icon_label", "IT"))
+            merged_roles[canonical_role_id] = merged_role
+            continue
+
+        role["role_id"] = canonical_role_id
+        role["icon_label"] = ROLE_ICON_LABELS.get(canonical_role_id, role.get("icon_label", "IT"))
+        merged_roles[canonical_role_id] = role
+
+    return sorted(merged_roles.values(), key=lambda item: item.get("name") or "")
 
 
 async def get_role_by_id(db: Any, role_id: str) -> dict[str, Any]:
@@ -866,6 +884,7 @@ def analyze_sections(
         "strengths": strengths,
         "weaknesses": weaknesses[:4],
         "priority_actions": priority_actions,
+        "readiness_level": readiness_level,
         "scoring_config_version": SCORING_CONFIG_VERSION,
         "model_version": gpt_review.model_version if gpt_review else "rule-based-local",
         "prompt_version": gpt_review.prompt_version if gpt_review else None,
@@ -875,6 +894,10 @@ def analyze_sections(
 
 DEFAULT_FREE_PLAN_ID = "DV_FREE"
 DEFAULT_PREMIUM_PLAN_ID = "DV_PREMIUM_30"
+
+
+def can_view_premium_roadmap(current_plan: str | None) -> bool:
+    return str(current_plan or "").lower() == "premium"
 
 
 async def resolve_quota_state(db: Any, user_id: str, now: datetime) -> dict[str, Any]:
@@ -1000,6 +1023,7 @@ async def create_analysis_for_cv(
     cv_id: str,
     role_id: str,
     user_id: str,
+    current_plan: str | None = None,
 ) -> dict[str, Any]:
     try:
         cv = await db["CV"].find_one({"_id": cv_id, "MaKH": user_id})
@@ -1021,6 +1045,7 @@ async def create_analysis_for_cv(
     role = await get_role_by_id(db, role_id)
     canonical_role_id = role["role_id"]
     analysis = analyze_sections(cv=cv, role=role)
+    can_view_roadmap = can_view_premium_roadmap(current_plan)
     now = datetime.now(timezone.utc)
     analysis_id = f"KQ_{uuid4().hex[:10].upper()}"
     criteria_map = {item["key"]: item["score"] for item in analysis["criteria_scores"]}
@@ -1049,12 +1074,12 @@ async def create_analysis_for_cv(
         "SectionScores": analysis["section_scores"],
         "SkillAssessment": analysis["skill_assessment"],
         "TechnicalSkillAssessment": analysis["technical_skill_assessment"],
-        "RoadmapRecommendation": analysis["roadmap_recommendation"],
+        "RoadmapRecommendation": analysis["roadmap_recommendation"] if can_view_roadmap else [],
         "Issues": analysis["issues"],
         "Strengths": analysis["strengths"],
         "Weaknesses": analysis["weaknesses"],
         "PriorityActions": analysis["priority_actions"],
-        "ReadinessLevel": analysis["readiness_level"],
+        "ReadinessLevel": analysis.get("readiness_level") or analysis["classification"],
         "ScoringConfigVersion": analysis["scoring_config_version"],
         "ModelVersion": analysis["model_version"],
         "PromptVersion": analysis["prompt_version"],
@@ -1088,7 +1113,7 @@ async def create_analysis_for_cv(
         ) from exc
 
     updated_cv = {**cv, "TrangThai": "completed", "MaNganh": canonical_role_id}
-    return format_analysis_result(result_document, updated_cv, role)
+    return format_analysis_result(result_document, updated_cv, role, can_view_roadmap=can_view_roadmap)
 
 
 def legacy_criteria_scores(result: dict[str, Any]) -> list[dict[str, Any]]:
@@ -1204,6 +1229,8 @@ def format_analysis_result(
     result: dict[str, Any],
     cv: dict[str, Any],
     role: dict[str, Any] | None,
+    *,
+    can_view_roadmap: bool = True,
 ) -> dict[str, Any]:
     total_score = int(result.get("DiemTongQuan", 0) or 0)
     classification = result.get("XepLoai")
@@ -1232,7 +1259,7 @@ def format_analysis_result(
         "section_scores": legacy_section_scores(result),
         "skill_assessment": result.get("SkillAssessment") or [],
         "technical_skill_assessment": technical_assessment,
-        "roadmap_recommendation": legacy_roadmap_recommendation(result, role, technical_assessment),
+        "roadmap_recommendation": legacy_roadmap_recommendation(result, role, technical_assessment) if can_view_roadmap else [],
         "readiness_level": result.get("ReadinessLevel") or classification,
         "issues": legacy_issues(result),
         "strengths": result.get("Strengths") or [],
@@ -1256,14 +1283,16 @@ async def get_analysis_detail(
     db: Any,
     analysis_id: str,
     user_id: str,
+    current_plan: str | None = None,
 ) -> dict[str, Any]:
+    can_view_roadmap = can_view_premium_roadmap(current_plan)
     try:
         result = await db["KETQUA_PTCV"].find_one({"_id": analysis_id})
     except DATABASE_ERRORS as exc:
         if analysis_id == "KQ001" and user_id == "KH001":
             demo_role_id = LEGACY_ROLE_ID_ALIASES.get("NG_FRONTEND", "NG_FRONTEND")
             role = next((role for role in DEFAULT_ROLES if role["role_id"] == demo_role_id), DEFAULT_ROLES[0])
-            return format_analysis_result(DEMO_RESULT, DEMO_CV, role)
+            return format_analysis_result(DEMO_RESULT, DEMO_CV, role, can_view_roadmap=can_view_roadmap)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={
@@ -1293,4 +1322,4 @@ async def get_analysis_detail(
         except HTTPException:
             role = None
 
-    return format_analysis_result(result, cv, role)
+    return format_analysis_result(result, cv, role, can_view_roadmap=can_view_roadmap)
