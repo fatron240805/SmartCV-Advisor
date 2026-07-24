@@ -23,6 +23,8 @@ SmartCV-Advisor/
 ├─ backend/
 │  ├─ app/
 │  │  ├─ main.py
+│  │  ├─ data/
+│  │  │  └─ it_role_skill_score_dataset.json
 │  │  ├─ db.py
 │  │  ├─ routes/
 │  │  │  ├─ cv.py
@@ -116,10 +118,13 @@ cd D:\SmartCV-Advisor\backend
 python create_collections.py
 ```
 
+Nếu database đã seed từ bản cũ, vẫn chạy lại lệnh trên để bổ sung 15 role từ dataset. Script dùng upsert nên không cần xóa database trước.
+
 Script sẽ tạo dữ liệu mẫu:
 
 - User demo `KH001`, `KH002`
-- Role IT demo: Frontend, Backend
+- 15 Role IT từ dataset `it_role_skill_score_dataset.json`
+- 43 kỹ năng duy nhất và 645 cấu hình role-skill score
 - CV demo `CV001`, `CV002`
 - Kết quả demo `KQ001`
 - Gói dịch vụ Free/Premium
@@ -189,6 +194,7 @@ Pipeline backend lấy cảm hứng từ notebook `Pipeline_CV_role_weighted.ipy
 
 3. `analysis_service.py`
    - Gọi GPT review section theo role/skill score.
+   - Danh sách role và `skill_score` lấy từ dataset `backend/app/data/it_role_skill_score_dataset.json`.
    - Backend vẫn normalize/cap điểm theo 0-100 và lưu `scoring_config_version`.
    - Nếu GPT lỗi, fallback rule-based scoring để demo không bị dừng.
    - Lưu metadata: `ModelVersion`, `PromptVersion`, `AnalysisMethod`.

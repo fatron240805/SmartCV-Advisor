@@ -1,0 +1,1020 @@
+{
+  "metadata": {
+    "title": "IT Role Skill Score Dataset",
+    "version": "1.0",
+    "total_roles": 15,
+    "score_scale": {
+      "0": "Không cần có",
+      "1": "Nice to have",
+      "2": "Quan trọng",
+      "3": "Rất quan trọng / bắt buộc"
+    }
+  },
+  "roles": [
+    {
+      "id": "IT-ROLE-001",
+      "role": "Backend Developer",
+      "description": "Chịu trách nhiệm xây dựng hệ thống xử lý trung tâm bằng Python và FastAPI; thiết kế kiến trúc API, xử lý logic nghiệp vụ phức tạp và quản trị cơ sở dữ liệu trên Supabase nhằm đảm bảo hệ thống vận hành ổn định và bảo mật.",
+      "skill_scores": {
+        "Programming & Software Foundations": {
+          "Python (Core & Async)": 3,
+          "C++ (Performance Optimization)": 2,
+          "SQL (Data Extraction & Querying)": 3,
+          "OOP & Design Patterns": 3,
+          "Data Structures & Algorithms": 3
+        },
+        "Frontend & Interactive Interfaces": {
+          "HTML5 / CSS3 / Tailwind": 1,
+          "JavaScript / TypeScript": 2,
+          "Frontend Frameworks (React/Vue/Angular)": 1,
+          "AI Demo UIs (Streamlit/Gradio/Chainlit)": 1,
+          "UI / UX Design": 1
+        },
+        "Backend & Architectural Engineering": {
+          "API Development (FastAPI/Express/Django)": 3,
+          "Microservices Architecture": 3,
+          "Message Brokers (Kafka/RabbitMQ)": 3,
+          "Relational Databases (PostgreSQL/MySQL)": 3,
+          "NoSQL Databases (MongoDB/Redis)": 3,
+          "Vector Databases (Milvus/Pinecone/Qdrant)": 2
+        },
+        "Modeling, Deep Learning & Algorithms": {
+          "Mathematics & Statistics (Linear Algebra, Calculus)": 1,
+          "Machine Learning Theory & Scikit-Learn": 1,
+          "Deep Learning Frameworks (PyTorch)": 0,
+          "Deep Learning Frameworks (TensorFlow/Keras)": 0,
+          "Computer Vision (OpenCV, I3D, YOLO)": 0,
+          "Traditional NLP (HMM, Core NLP Techniques)": 0,
+          "Generative AI, LLMs & Prompt Engineering": 2,
+          "Retrieval-Augmented Generation (RAG) Systems": 2,
+          "Agentic AI & Multi-Agent Frameworks (LangChain/Autogen)": 1
+        },
+        "Data Pipelines & Big Data Systems": {
+          "Data Wrangling & Feature Engineering (Pandas/NumPy)": 2,
+          "Data Pipeline Orchestration (Airflow/Prefect)": 2,
+          "Data Transformation & Warehouse (dbt/BigQuery)": 2,
+          "Big Data Processing (Spark/Flink)": 2
+        },
+        "Deployment, Infrastructure & MLOps": {
+          "Containerization (Docker)": 3,
+          "Orchestration (Kubernetes)": 2,
+          "Cloud Platforms (AWS/GCP/Azure)": 2,
+          "CI/CD Pipelines (GitHub Actions/GitLab CI)": 2,
+          "Model Tracking & Registry (MLflow/WandB)": 1,
+          "Model Serving (Triton/FastAPI/Ollama)": 2,
+          "Observability & Monitoring (Prometheus/Grafana)": 2
+        },
+        "Testing, QA & Model Validation": {
+          "Software Testing (Unit, Integration)": 3,
+          "AI Evaluation, Validation & Benchmarking": 1,
+          "Claim Normalization & Fact-Checking Logic": 1
+        },
+        "Business, Security & AI Governance": {
+          "Technical Writing & Communication": 2,
+          "Agile / Scrum Methodologies": 2,
+          "AI Security, Jailbreak Defense & Data Privacy": 2,
+          "AI Ethics, Governance & Bias Mitigation": 1
+        }
+      },
+      "roadmap": "Foundation: Git, GitHub, Linux, HTTP/HTTPS, REST API, Data Structures & Algorithms, OOP & Design Patterns\nBackend Development: FastAPI, Django, Flask, Spring Boot, ASP.NET Core, ExpressJS, NestJS\nDatabase: PostgreSQL, MySQL, MongoDB, Redis, SQL Optimization\nAdvanced Backend: JWT, OAuth2, Kafka, RabbitMQ, gRPC, WebSocket\nSystem Design: Load Balancing, Sharding, Replication, Distributed Systems\nDeployment: Docker, Kubernetes, AWS/Azure/GCP, GitHub Actions, Prometheus, Grafana"
+    },
+    {
+      "id": "IT-ROLE-002",
+      "role": "Frontend Developer",
+      "description": "Phát triển giao diện người dùng (UI) trực quan bằng React và Tailwind CSS; tối ưu hóa trải nghiệm người dùng (UX) trên các tính năng trọng tâm như Dashboard phân tích chỉ số CV và hệ thống hiển thị lộ trình phát triển sự nghiệp.",
+      "skill_scores": {
+        "Programming & Software Foundations": {
+          "Python (Core & Async)": 1,
+          "C++ (Performance Optimization)": 0,
+          "SQL (Data Extraction & Querying)": 1,
+          "OOP & Design Patterns": 2,
+          "Data Structures & Algorithms": 2
+        },
+        "Frontend & Interactive Interfaces": {
+          "HTML5 / CSS3 / Tailwind": 3,
+          "JavaScript / TypeScript": 3,
+          "Frontend Frameworks (React/Vue/Angular)": 3,
+          "AI Demo UIs (Streamlit/Gradio/Chainlit)": 2,
+          "UI / UX Design": 3
+        },
+        "Backend & Architectural Engineering": {
+          "API Development (FastAPI/Express/Django)": 1,
+          "Microservices Architecture": 1,
+          "Message Brokers (Kafka/RabbitMQ)": 0,
+          "Relational Databases (PostgreSQL/MySQL)": 1,
+          "NoSQL Databases (MongoDB/Redis)": 1,
+          "Vector Databases (Milvus/Pinecone/Qdrant)": 0
+        },
+        "Modeling, Deep Learning & Algorithms": {
+          "Mathematics & Statistics (Linear Algebra, Calculus)": 0,
+          "Machine Learning Theory & Scikit-Learn": 0,
+          "Deep Learning Frameworks (PyTorch)": 0,
+          "Deep Learning Frameworks (TensorFlow/Keras)": 0,
+          "Computer Vision (OpenCV, I3D, YOLO)": 0,
+          "Traditional NLP (HMM, Core NLP Techniques)": 0,
+          "Generative AI, LLMs & Prompt Engineering": 1,
+          "Retrieval-Augmented Generation (RAG) Systems": 0,
+          "Agentic AI & Multi-Agent Frameworks (LangChain/Autogen)": 0
+        },
+        "Data Pipelines & Big Data Systems": {
+          "Data Wrangling & Feature Engineering (Pandas/NumPy)": 0,
+          "Data Pipeline Orchestration (Airflow/Prefect)": 0,
+          "Data Transformation & Warehouse (dbt/BigQuery)": 0,
+          "Big Data Processing (Spark/Flink)": 0
+        },
+        "Deployment, Infrastructure & MLOps": {
+          "Containerization (Docker)": 1,
+          "Orchestration (Kubernetes)": 0,
+          "Cloud Platforms (AWS/GCP/Azure)": 1,
+          "CI/CD Pipelines (GitHub Actions/GitLab CI)": 2,
+          "Model Tracking & Registry (MLflow/WandB)": 0,
+          "Model Serving (Triton/FastAPI/Ollama)": 0,
+          "Observability & Monitoring (Prometheus/Grafana)": 1
+        },
+        "Testing, QA & Model Validation": {
+          "Software Testing (Unit, Integration)": 2,
+          "AI Evaluation, Validation & Benchmarking": 0,
+          "Claim Normalization & Fact-Checking Logic": 0
+        },
+        "Business, Security & AI Governance": {
+          "Technical Writing & Communication": 2,
+          "Agile / Scrum Methodologies": 2,
+          "AI Security, Jailbreak Defense & Data Privacy": 0,
+          "AI Ethics, Governance & Bias Mitigation": 0
+        }
+      },
+      "roadmap": "Foundation: HTML5, CSS3, JavaScript ES6+\nFrontend Core: TypeScript, React, Vue, Angular\nUI Development: TailwindCSS, Material UI, Ant Design, Bootstrap\nAdvanced Frontend: Redux, Zustand, React Query, Next.js, Nuxt.js\nTesting: Jest, Cypress, Playwright\nDeployment: Vercel, Netlify, Cloudflare Pages"
+    },
+    {
+      "id": "IT-ROLE-003",
+      "role": "Fullstack Developer",
+      "description": "Đảm nhiệm vai trò linh hoạt trong việc phát triển cả Frontend và Backend; điều phối luồng dữ liệu từ khâu người dùng tải lên hồ sơ cho đến khi nhận được phản hồi từ AI, đảm bảo sự đồng bộ toàn diện cho nền tảng SaaS.",
+      "skill_scores": {
+        "Programming & Software Foundations": {
+          "Python (Core & Async)": 2,
+          "C++ (Performance Optimization)": 1,
+          "SQL (Data Extraction & Querying)": 3,
+          "OOP & Design Patterns": 3,
+          "Data Structures & Algorithms": 3
+        },
+        "Frontend & Interactive Interfaces": {
+          "HTML5 / CSS3 / Tailwind": 3,
+          "JavaScript / TypeScript": 3,
+          "Frontend Frameworks (React/Vue/Angular)": 3,
+          "AI Demo UIs (Streamlit/Gradio/Chainlit)": 2,
+          "UI / UX Design": 2
+        },
+        "Backend & Architectural Engineering": {
+          "API Development (FastAPI/Express/Django)": 3,
+          "Microservices Architecture": 3,
+          "Message Brokers (Kafka/RabbitMQ)": 2,
+          "Relational Databases (PostgreSQL/MySQL)": 3,
+          "NoSQL Databases (MongoDB/Redis)": 3,
+          "Vector Databases (Milvus/Pinecone/Qdrant)": 2
+        },
+        "Modeling, Deep Learning & Algorithms": {
+          "Mathematics & Statistics (Linear Algebra, Calculus)": 1,
+          "Machine Learning Theory & Scikit-Learn": 1,
+          "Deep Learning Frameworks (PyTorch)": 0,
+          "Deep Learning Frameworks (TensorFlow/Keras)": 0,
+          "Computer Vision (OpenCV, I3D, YOLO)": 0,
+          "Traditional NLP (HMM, Core NLP Techniques)": 0,
+          "Generative AI, LLMs & Prompt Engineering": 2,
+          "Retrieval-Augmented Generation (RAG) Systems": 2,
+          "Agentic AI & Multi-Agent Frameworks (LangChain/Autogen)": 1
+        },
+        "Data Pipelines & Big Data Systems": {
+          "Data Wrangling & Feature Engineering (Pandas/NumPy)": 1,
+          "Data Pipeline Orchestration (Airflow/Prefect)": 1,
+          "Data Transformation & Warehouse (dbt/BigQuery)": 2,
+          "Big Data Processing (Spark/Flink)": 1
+        },
+        "Deployment, Infrastructure & MLOps": {
+          "Containerization (Docker)": 3,
+          "Orchestration (Kubernetes)": 2,
+          "Cloud Platforms (AWS/GCP/Azure)": 2,
+          "CI/CD Pipelines (GitHub Actions/GitLab CI)": 3,
+          "Model Tracking & Registry (MLflow/WandB)": 1,
+          "Model Serving (Triton/FastAPI/Ollama)": 2,
+          "Observability & Monitoring (Prometheus/Grafana)": 2
+        },
+        "Testing, QA & Model Validation": {
+          "Software Testing (Unit, Integration)": 3,
+          "AI Evaluation, Validation & Benchmarking": 1,
+          "Claim Normalization & Fact-Checking Logic": 1
+        },
+        "Business, Security & AI Governance": {
+          "Technical Writing & Communication": 2,
+          "Agile / Scrum Methodologies": 2,
+          "AI Security, Jailbreak Defense & Data Privacy": 1,
+          "AI Ethics, Governance & Bias Mitigation": 1
+        }
+      },
+      "roadmap": "Foundation: Git, GitHub, Linux, HTTP/HTTPS, Data Structures & Algorithms, OOP & Design Patterns\nFrontend: HTML5, CSS3, JavaScript, TypeScript, React, Vue, Angular\nBackend: FastAPI, Spring Boot, ASP.NET Core, ExpressJS, NestJS\nDatabase: PostgreSQL, MySQL, MongoDB, Redis\nFullstack Architecture: REST API, GraphQL, Authentication, Authorization, API Gateway\nDevOps & Deployment: Docker, Kubernetes, AWS/Azure/GCP, CI/CD, Monitoring"
+    },
+    {
+      "id": "IT-ROLE-004",
+      "role": "Mobile Application Developer",
+      "description": "Thiết kế và xây dựng ứng dụng trên các nền tảng di động (iOS/Android/Flutter); tối ưu hóa tính năng AI Chat và thông báo lộ trình học tập, giúp người dùng có thể chỉnh sửa CV và theo dõi sự nghiệp mọi lúc mọi nơi.",
+      "skill_scores": {
+        "Programming & Software Foundations": {
+          "Python (Core & Async)": 1,
+          "C++ (Performance Optimization)": 1,
+          "SQL (Data Extraction & Querying)": 1,
+          "OOP & Design Patterns": 3,
+          "Data Structures & Algorithms": 3
+        },
+        "Frontend & Interactive Interfaces": {
+          "HTML5 / CSS3 / Tailwind": 1,
+          "JavaScript / TypeScript": 2,
+          "Frontend Frameworks (React/Vue/Angular)": 1,
+          "AI Demo UIs (Streamlit/Gradio/Chainlit)": 1,
+          "UI / UX Design": 3
+        },
+        "Backend & Architectural Engineering": {
+          "API Development (FastAPI/Express/Django)": 2,
+          "Microservices Architecture": 1,
+          "Message Brokers (Kafka/RabbitMQ)": 1,
+          "Relational Databases (PostgreSQL/MySQL)": 2,
+          "NoSQL Databases (MongoDB/Redis)": 2,
+          "Vector Databases (Milvus/Pinecone/Qdrant)": 0
+        },
+        "Modeling, Deep Learning & Algorithms": {
+          "Mathematics & Statistics (Linear Algebra, Calculus)": 0,
+          "Machine Learning Theory & Scikit-Learn": 0,
+          "Deep Learning Frameworks (PyTorch)": 0,
+          "Deep Learning Frameworks (TensorFlow/Keras)": 0,
+          "Computer Vision (OpenCV, I3D, YOLO)": 0,
+          "Traditional NLP (HMM, Core NLP Techniques)": 0,
+          "Generative AI, LLMs & Prompt Engineering": 1,
+          "Retrieval-Augmented Generation (RAG) Systems": 0,
+          "Agentic AI & Multi-Agent Frameworks (LangChain/Autogen)": 0
+        },
+        "Data Pipelines & Big Data Systems": {
+          "Data Wrangling & Feature Engineering (Pandas/NumPy)": 0,
+          "Data Pipeline Orchestration (Airflow/Prefect)": 0,
+          "Data Transformation & Warehouse (dbt/BigQuery)": 0,
+          "Big Data Processing (Spark/Flink)": 0
+        },
+        "Deployment, Infrastructure & MLOps": {
+          "Containerization (Docker)": 2,
+          "Orchestration (Kubernetes)": 1,
+          "Cloud Platforms (AWS/GCP/Azure)": 2,
+          "CI/CD Pipelines (GitHub Actions/GitLab CI)": 2,
+          "Model Tracking & Registry (MLflow/WandB)": 0,
+          "Model Serving (Triton/FastAPI/Ollama)": 1,
+          "Observability & Monitoring (Prometheus/Grafana)": 1
+        },
+        "Testing, QA & Model Validation": {
+          "Software Testing (Unit, Integration)": 3,
+          "AI Evaluation, Validation & Benchmarking": 0,
+          "Claim Normalization & Fact-Checking Logic": 0
+        },
+        "Business, Security & AI Governance": {
+          "Technical Writing & Communication": 2,
+          "Agile / Scrum Methodologies": 2,
+          "AI Security, Jailbreak Defense & Data Privacy": 1,
+          "AI Ethics, Governance & Bias Mitigation": 0
+        }
+      },
+      "roadmap": "Foundation: Programming Fundamentals, OOP, Data Structures & Algorithms, Git\nAndroid Development: Java, Kotlin, Android SDK, Jetpack Compose\niOS Development: Swift, SwiftUI, UIKit\nCross-platform Development: Flutter, Dart, React Native\nBackend Integration: REST API, GraphQL, Firebase\nMobile Advanced: Push Notification, Offline Storage, Mobile Security, Performance Optimization\nDeployment: Google Play Console, Apple Developer Program, Firebase Analytics"
+    },
+    {
+      "id": "IT-ROLE-005",
+      "role": "AI / Machine Learning Engineer",
+      "description": "Triển khai các công nghệ NLP và Layout Detection để trích xuất dữ liệu từ CV; tích hợp và tinh chỉnh các API ngôn ngữ lớn (LLM) như OpenAI/Anthropic để cung cấp khả năng phân tích và phản hồi thông minh.",
+      "skill_scores": {
+        "Programming & Software Foundations": {
+          "Python (Core & Async)": 3,
+          "C++ (Performance Optimization)": 2,
+          "SQL (Data Extraction & Querying)": 2,
+          "OOP & Design Patterns": 2,
+          "Data Structures & Algorithms": 3
+        },
+        "Frontend & Interactive Interfaces": {
+          "HTML5 / CSS3 / Tailwind": 0,
+          "JavaScript / TypeScript": 1,
+          "Frontend Frameworks (React/Vue/Angular)": 0,
+          "AI Demo UIs (Streamlit/Gradio/Chainlit)": 3,
+          "UI / UX Design": 0
+        },
+        "Backend & Architectural Engineering": {
+          "API Development (FastAPI/Express/Django)": 2,
+          "Microservices Architecture": 1,
+          "Message Brokers (Kafka/RabbitMQ)": 1,
+          "Relational Databases (PostgreSQL/MySQL)": 2,
+          "NoSQL Databases (MongoDB/Redis)": 2,
+          "Vector Databases (Milvus/Pinecone/Qdrant)": 3
+        },
+        "Modeling, Deep Learning & Algorithms": {
+          "Mathematics & Statistics (Linear Algebra, Calculus)": 3,
+          "Machine Learning Theory & Scikit-Learn": 3,
+          "Deep Learning Frameworks (PyTorch)": 3,
+          "Deep Learning Frameworks (TensorFlow/Keras)": 3,
+          "Computer Vision (OpenCV, I3D, YOLO)": 3,
+          "Traditional NLP (HMM, Core NLP Techniques)": 3,
+          "Generative AI, LLMs & Prompt Engineering": 3,
+          "Retrieval-Augmented Generation (RAG) Systems": 3,
+          "Agentic AI & Multi-Agent Frameworks (LangChain/Autogen)": 3
+        },
+        "Data Pipelines & Big Data Systems": {
+          "Data Wrangling & Feature Engineering (Pandas/NumPy)": 3,
+          "Data Pipeline Orchestration (Airflow/Prefect)": 2,
+          "Data Transformation & Warehouse (dbt/BigQuery)": 1,
+          "Big Data Processing (Spark/Flink)": 2
+        },
+        "Deployment, Infrastructure & MLOps": {
+          "Containerization (Docker)": 2,
+          "Orchestration (Kubernetes)": 2,
+          "Cloud Platforms (AWS/GCP/Azure)": 2,
+          "CI/CD Pipelines (GitHub Actions/GitLab CI)": 2,
+          "Model Tracking & Registry (MLflow/WandB)": 3,
+          "Model Serving (Triton/FastAPI/Ollama)": 3,
+          "Observability & Monitoring (Prometheus/Grafana)": 1
+        },
+        "Testing, QA & Model Validation": {
+          "Software Testing (Unit, Integration)": 2,
+          "AI Evaluation, Validation & Benchmarking": 3,
+          "Claim Normalization & Fact-Checking Logic": 2
+        },
+        "Business, Security & AI Governance": {
+          "Technical Writing & Communication": 2,
+          "Agile / Scrum Methodologies": 1,
+          "AI Security, Jailbreak Defense & Data Privacy": 3,
+          "AI Ethics, Governance & Bias Mitigation": 2
+        }
+      },
+      "roadmap": "Foundation: Python, Git, Linux, SQL, Statistics, Linear Algebra, Calculus, Probability\nData Processing: NumPy, Pandas, Matplotlib, Seaborn\nMachine Learning: Scikit-Learn, XGBoost, LightGBM, CatBoost\nDeep Learning: PyTorch, TensorFlow, Keras\nAI Specialization: OpenCV, YOLO, Hugging Face Transformers, spaCy\nGenerative AI: OpenAI API, Gemini API, Claude API, Prompt Engineering\nRAG & Agents: LangChain, LangGraph, LlamaIndex, CrewAI, AutoGen\nDeployment & MLOps: FastAPI, Docker, Kubernetes, MLflow, AWS SageMaker"
+    },
+    {
+      "id": "IT-ROLE-006",
+      "role": "Data Scientist",
+      "description": "Nghiên cứu và xây dựng các thuật toán Matching Score; phát triển các mô hình dự báo xu hướng việc làm và tiêu chuẩn tuyển dụng để đưa ra các gợi ý kỹ năng (Skill Gap) chính xác cho ứng viên.",
+      "skill_scores": {
+        "Programming & Software Foundations": {
+          "Python (Core & Async)": 3,
+          "C++ (Performance Optimization)": 1,
+          "SQL (Data Extraction & Querying)": 3,
+          "OOP & Design Patterns": 2,
+          "Data Structures & Algorithms": 3
+        },
+        "Frontend & Interactive Interfaces": {
+          "HTML5 / CSS3 / Tailwind": 0,
+          "JavaScript / TypeScript": 1,
+          "Frontend Frameworks (React/Vue/Angular)": 0,
+          "AI Demo UIs (Streamlit/Gradio/Chainlit)": 2,
+          "UI / UX Design": 0
+        },
+        "Backend & Architectural Engineering": {
+          "API Development (FastAPI/Express/Django)": 1,
+          "Microservices Architecture": 0,
+          "Message Brokers (Kafka/RabbitMQ)": 1,
+          "Relational Databases (PostgreSQL/MySQL)": 2,
+          "NoSQL Databases (MongoDB/Redis)": 1,
+          "Vector Databases (Milvus/Pinecone/Qdrant)": 2
+        },
+        "Modeling, Deep Learning & Algorithms": {
+          "Mathematics & Statistics (Linear Algebra, Calculus)": 3,
+          "Machine Learning Theory & Scikit-Learn": 3,
+          "Deep Learning Frameworks (PyTorch)": 3,
+          "Deep Learning Frameworks (TensorFlow/Keras)": 3,
+          "Computer Vision (OpenCV, I3D, YOLO)": 2,
+          "Traditional NLP (HMM, Core NLP Techniques)": 2,
+          "Generative AI, LLMs & Prompt Engineering": 2,
+          "Retrieval-Augmented Generation (RAG) Systems": 2,
+          "Agentic AI & Multi-Agent Frameworks (LangChain/Autogen)": 2
+        },
+        "Data Pipelines & Big Data Systems": {
+          "Data Wrangling & Feature Engineering (Pandas/NumPy)": 3,
+          "Data Pipeline Orchestration (Airflow/Prefect)": 2,
+          "Data Transformation & Warehouse (dbt/BigQuery)": 2,
+          "Big Data Processing (Spark/Flink)": 3
+        },
+        "Deployment, Infrastructure & MLOps": {
+          "Containerization (Docker)": 1,
+          "Orchestration (Kubernetes)": 1,
+          "Cloud Platforms (AWS/GCP/Azure)": 2,
+          "CI/CD Pipelines (GitHub Actions/GitLab CI)": 1,
+          "Model Tracking & Registry (MLflow/WandB)": 2,
+          "Model Serving (Triton/FastAPI/Ollama)": 1,
+          "Observability & Monitoring (Prometheus/Grafana)": 1
+        },
+        "Testing, QA & Model Validation": {
+          "Software Testing (Unit, Integration)": 1,
+          "AI Evaluation, Validation & Benchmarking": 2,
+          "Claim Normalization & Fact-Checking Logic": 1
+        },
+        "Business, Security & AI Governance": {
+          "Technical Writing & Communication": 2,
+          "Agile / Scrum Methodologies": 1,
+          "AI Security, Jailbreak Defense & Data Privacy": 2,
+          "AI Ethics, Governance & Bias Mitigation": 2
+        }
+      },
+      "roadmap": "Foundation: Python, SQL, Statistics, Probability, Linear Algebra\nData Analysis: Pandas, NumPy, Matplotlib, Seaborn\nMachine Learning: Scikit-Learn, XGBoost, LightGBM\nExperimentation: A/B Testing, Hypothesis Testing, Causal Inference\nAdvanced Analytics: Deep Learning, Recommendation Systems, Time Series Forecasting\nDeployment: MLflow, FastAPI, Docker"
+    },
+    {
+      "id": "IT-ROLE-007",
+      "role": "Data Analyst",
+      "description": "Thu thập và xử lý dữ liệu thị trường lao động; phân tích các tiêu chuẩn lọc hồ sơ của hệ thống ATS và dữ liệu người dùng để cung cấp các báo cáo chiến lược cho việc nâng cấp tính năng sản phẩm.",
+      "skill_scores": {
+        "Programming & Software Foundations": {
+          "Python (Core & Async)": 2,
+          "C++ (Performance Optimization)": 0,
+          "SQL (Data Extraction & Querying)": 3,
+          "OOP & Design Patterns": 1,
+          "Data Structures & Algorithms": 2
+        },
+        "Frontend & Interactive Interfaces": {
+          "HTML5 / CSS3 / Tailwind": 0,
+          "JavaScript / TypeScript": 1,
+          "Frontend Frameworks (React/Vue/Angular)": 0,
+          "AI Demo UIs (Streamlit/Gradio/Chainlit)": 2,
+          "UI / UX Design": 1
+        },
+        "Backend & Architectural Engineering": {
+          "API Development (FastAPI/Express/Django)": 1,
+          "Microservices Architecture": 0,
+          "Message Brokers (Kafka/RabbitMQ)": 1,
+          "Relational Databases (PostgreSQL/MySQL)": 2,
+          "NoSQL Databases (MongoDB/Redis)": 1,
+          "Vector Databases (Milvus/Pinecone/Qdrant)": 1
+        },
+        "Modeling, Deep Learning & Algorithms": {
+          "Mathematics & Statistics (Linear Algebra, Calculus)": 2,
+          "Machine Learning Theory & Scikit-Learn": 2,
+          "Deep Learning Frameworks (PyTorch)": 1,
+          "Deep Learning Frameworks (TensorFlow/Keras)": 1,
+          "Computer Vision (OpenCV, I3D, YOLO)": 0,
+          "Traditional NLP (HMM, Core NLP Techniques)": 1,
+          "Generative AI, LLMs & Prompt Engineering": 2,
+          "Retrieval-Augmented Generation (RAG) Systems": 1,
+          "Agentic AI & Multi-Agent Frameworks (LangChain/Autogen)": 1
+        },
+        "Data Pipelines & Big Data Systems": {
+          "Data Wrangling & Feature Engineering (Pandas/NumPy)": 3,
+          "Data Pipeline Orchestration (Airflow/Prefect)": 2,
+          "Data Transformation & Warehouse (dbt/BigQuery)": 3,
+          "Big Data Processing (Spark/Flink)": 3
+        },
+        "Deployment, Infrastructure & MLOps": {
+          "Containerization (Docker)": 1,
+          "Orchestration (Kubernetes)": 0,
+          "Cloud Platforms (AWS/GCP/Azure)": 2,
+          "CI/CD Pipelines (GitHub Actions/GitLab CI)": 0,
+          "Model Tracking & Registry (MLflow/WandB)": 1,
+          "Model Serving (Triton/FastAPI/Ollama)": 0,
+          "Observability & Monitoring (Prometheus/Grafana)": 1
+        },
+        "Testing, QA & Model Validation": {
+          "Software Testing (Unit, Integration)": 1,
+          "AI Evaluation, Validation & Benchmarking": 1,
+          "Claim Normalization & Fact-Checking Logic": 1
+        },
+        "Business, Security & AI Governance": {
+          "Technical Writing & Communication": 2,
+          "Agile / Scrum Methodologies": 2,
+          "AI Security, Jailbreak Defense & Data Privacy": 1,
+          "AI Ethics, Governance & Bias Mitigation": 1
+        }
+      },
+      "roadmap": "Foundation: Excel, SQL, Statistics, Business Fundamentals\nData Processing: Pandas, NumPy, Data Cleaning\nVisualization: Power BI, Tableau, Looker Studio\nBusiness Analytics: KPI Design, Dashboard Design, Reporting\nAdvanced Analytics: Forecasting, Customer Analytics, Marketing Analytics\nAutomation: Python Automation, ETL Basics"
+    },
+    {
+      "id": "IT-ROLE-008",
+      "role": "Business Analyst",
+      "description": "Làm cầu nối giữa nhu cầu người dùng và đội ngũ kỹ thuật; phân tích các pain points của sinh viên và thị trường lao động để cụ thể hóa thành các yêu cầu tính năng cho sản phẩm SmartCV Advisor.",
+      "skill_scores": {
+        "Programming & Software Foundations": {
+          "Python (Core & Async)": 1,
+          "C++ (Performance Optimization)": 0,
+          "SQL (Data Extraction & Querying)": 2,
+          "OOP & Design Patterns": 1,
+          "Data Structures & Algorithms": 1
+        },
+        "Frontend & Interactive Interfaces": {
+          "HTML5 / CSS3 / Tailwind": 1,
+          "JavaScript / TypeScript": 1,
+          "Frontend Frameworks (React/Vue/Angular)": 0,
+          "AI Demo UIs (Streamlit/Gradio/Chainlit)": 1,
+          "UI / UX Design": 2
+        },
+        "Backend & Architectural Engineering": {
+          "API Development (FastAPI/Express/Django)": 1,
+          "Microservices Architecture": 0,
+          "Message Brokers (Kafka/RabbitMQ)": 0,
+          "Relational Databases (PostgreSQL/MySQL)": 1,
+          "NoSQL Databases (MongoDB/Redis)": 0,
+          "Vector Databases (Milvus/Pinecone/Qdrant)": 0
+        },
+        "Modeling, Deep Learning & Algorithms": {
+          "Mathematics & Statistics (Linear Algebra, Calculus)": 1,
+          "Machine Learning Theory & Scikit-Learn": 1,
+          "Deep Learning Frameworks (PyTorch)": 0,
+          "Deep Learning Frameworks (TensorFlow/Keras)": 0,
+          "Computer Vision (OpenCV, I3D, YOLO)": 0,
+          "Traditional NLP (HMM, Core NLP Techniques)": 0,
+          "Generative AI, LLMs & Prompt Engineering": 2,
+          "Retrieval-Augmented Generation (RAG) Systems": 1,
+          "Agentic AI & Multi-Agent Frameworks (LangChain/Autogen)": 1
+        },
+        "Data Pipelines & Big Data Systems": {
+          "Data Wrangling & Feature Engineering (Pandas/NumPy)": 1,
+          "Data Pipeline Orchestration (Airflow/Prefect)": 1,
+          "Data Transformation & Warehouse (dbt/BigQuery)": 2,
+          "Big Data Processing (Spark/Flink)": 1
+        },
+        "Deployment, Infrastructure & MLOps": {
+          "Containerization (Docker)": 0,
+          "Orchestration (Kubernetes)": 0,
+          "Cloud Platforms (AWS/GCP/Azure)": 1,
+          "CI/CD Pipelines (GitHub Actions/GitLab CI)": 0,
+          "Model Tracking & Registry (MLflow/WandB)": 0,
+          "Model Serving (Triton/FastAPI/Ollama)": 0,
+          "Observability & Monitoring (Prometheus/Grafana)": 0
+        },
+        "Testing, QA & Model Validation": {
+          "Software Testing (Unit, Integration)": 1,
+          "AI Evaluation, Validation & Benchmarking": 1,
+          "Claim Normalization & Fact-Checking Logic": 1
+        },
+        "Business, Security & AI Governance": {
+          "Technical Writing & Communication": 3,
+          "Agile / Scrum Methodologies": 3,
+          "AI Security, Jailbreak Defense & Data Privacy": 1,
+          "AI Ethics, Governance & Bias Mitigation": 2
+        }
+      },
+      "roadmap": "Foundation: Business Process Analysis, Requirement Gathering, Communication Skills\nDocumentation: BRD, FRD, SRS, User Story, Use Case\nModeling: UML, BPMN, ERD\nTools: Jira, Confluence, Draw.io, Figma\nAgile Practices: Scrum, Kanban, Sprint Planning\nAdvanced BA: Product Discovery, Stakeholder Management, Data Analysis, SQL Basics"
+    },
+    {
+      "id": "IT-ROLE-009",
+      "role": "DataOps / MLOps",
+      "description": "Xây dựng và quản lý quy trình tự động hóa cho các mô hình học máy; giám sát hiệu suất của AI trong môi trường thực tế và đảm bảo luồng dữ liệu cho việc huấn luyện/tinh chỉnh mô hình luôn thông suốt.",
+      "skill_scores": {
+        "Programming & Software Foundations": {
+          "Python (Core & Async)": 3,
+          "C++ (Performance Optimization)": 1,
+          "SQL (Data Extraction & Querying)": 2,
+          "OOP & Design Patterns": 2,
+          "Data Structures & Algorithms": 2
+        },
+        "Frontend & Interactive Interfaces": {
+          "HTML5 / CSS3 / Tailwind": 0,
+          "JavaScript / TypeScript": 1,
+          "Frontend Frameworks (React/Vue/Angular)": 0,
+          "AI Demo UIs (Streamlit/Gradio/Chainlit)": 1,
+          "UI / UX Design": 0
+        },
+        "Backend & Architectural Engineering": {
+          "API Development (FastAPI/Express/Django)": 2,
+          "Microservices Architecture": 2,
+          "Message Brokers (Kafka/RabbitMQ)": 2,
+          "Relational Databases (PostgreSQL/MySQL)": 2,
+          "NoSQL Databases (MongoDB/Redis)": 2,
+          "Vector Databases (Milvus/Pinecone/Qdrant)": 2
+        },
+        "Modeling, Deep Learning & Algorithms": {
+          "Mathematics & Statistics (Linear Algebra, Calculus)": 1,
+          "Machine Learning Theory & Scikit-Learn": 2,
+          "Deep Learning Frameworks (PyTorch)": 2,
+          "Deep Learning Frameworks (TensorFlow/Keras)": 2,
+          "Computer Vision (OpenCV, I3D, YOLO)": 1,
+          "Traditional NLP (HMM, Core NLP Techniques)": 1,
+          "Generative AI, LLMs & Prompt Engineering": 2,
+          "Retrieval-Augmented Generation (RAG) Systems": 2,
+          "Agentic AI & Multi-Agent Frameworks (LangChain/Autogen)": 2
+        },
+        "Data Pipelines & Big Data Systems": {
+          "Data Wrangling & Feature Engineering (Pandas/NumPy)": 2,
+          "Data Pipeline Orchestration (Airflow/Prefect)": 3,
+          "Data Transformation & Warehouse (dbt/BigQuery)": 3,
+          "Big Data Processing (Spark/Flink)": 3
+        },
+        "Deployment, Infrastructure & MLOps": {
+          "Containerization (Docker)": 3,
+          "Orchestration (Kubernetes)": 3,
+          "Cloud Platforms (AWS/GCP/Azure)": 3,
+          "CI/CD Pipelines (GitHub Actions/GitLab CI)": 3,
+          "Model Tracking & Registry (MLflow/WandB)": 3,
+          "Model Serving (Triton/FastAPI/Ollama)": 3,
+          "Observability & Monitoring (Prometheus/Grafana)": 3
+        },
+        "Testing, QA & Model Validation": {
+          "Software Testing (Unit, Integration)": 2,
+          "AI Evaluation, Validation & Benchmarking": 3,
+          "Claim Normalization & Fact-Checking Logic": 1
+        },
+        "Business, Security & AI Governance": {
+          "Technical Writing & Communication": 2,
+          "Agile / Scrum Methodologies": 2,
+          "AI Security, Jailbreak Defense & Data Privacy": 2,
+          "AI Ethics, Governance & Bias Mitigation": 1
+        }
+      },
+      "roadmap": "Foundation: Python, Linux, Git, Networking Basics\nData Engineering: Airflow, Prefect, dbt, Kafka\nMLOps: MLflow, DVC, Kubeflow, Feast\nContainerization: Docker, Kubernetes\nCloud AI Platforms: AWS SageMaker, Azure ML, Vertex AI\nMonitoring: Prometheus, Grafana, Evidently AI, WhyLabs\nCI/CD: GitHub Actions, GitLab CI/CD, Jenkins"
+    },
+    {
+      "id": "IT-ROLE-010",
+      "role": "Cloud Engineer",
+      "description": "Quản lý và tối ưu hóa hạ tầng điện toán đám mây trên các nền tảng Vercel, Render và Supabase; đảm bảo hệ thống có khả năng mở rộng linh hoạt và kiểm soát chi phí vận hành cho dự án.",
+      "skill_scores": {
+        "Programming & Software Foundations": {
+          "Python (Core & Async)": 2,
+          "C++ (Performance Optimization)": 1,
+          "SQL (Data Extraction & Querying)": 2,
+          "OOP & Design Patterns": 2,
+          "Data Structures & Algorithms": 2
+        },
+        "Frontend & Interactive Interfaces": {
+          "HTML5 / CSS3 / Tailwind": 0,
+          "JavaScript / TypeScript": 1,
+          "Frontend Frameworks (React/Vue/Angular)": 0,
+          "AI Demo UIs (Streamlit/Gradio/Chainlit)": 1,
+          "UI / UX Design": 0
+        },
+        "Backend & Architectural Engineering": {
+          "API Development (FastAPI/Express/Django)": 2,
+          "Microservices Architecture": 3,
+          "Message Brokers (Kafka/RabbitMQ)": 2,
+          "Relational Databases (PostgreSQL/MySQL)": 2,
+          "NoSQL Databases (MongoDB/Redis)": 2,
+          "Vector Databases (Milvus/Pinecone/Qdrant)": 2
+        },
+        "Modeling, Deep Learning & Algorithms": {
+          "Mathematics & Statistics (Linear Algebra, Calculus)": 1,
+          "Machine Learning Theory & Scikit-Learn": 1,
+          "Deep Learning Frameworks (PyTorch)": 1,
+          "Deep Learning Frameworks (TensorFlow/Keras)": 1,
+          "Computer Vision (OpenCV, I3D, YOLO)": 0,
+          "Traditional NLP (HMM, Core NLP Techniques)": 0,
+          "Generative AI, LLMs & Prompt Engineering": 1,
+          "Retrieval-Augmented Generation (RAG) Systems": 1,
+          "Agentic AI & Multi-Agent Frameworks (LangChain/Autogen)": 1
+        },
+        "Data Pipelines & Big Data Systems": {
+          "Data Wrangling & Feature Engineering (Pandas/NumPy)": 1,
+          "Data Pipeline Orchestration (Airflow/Prefect)": 2,
+          "Data Transformation & Warehouse (dbt/BigQuery)": 2,
+          "Big Data Processing (Spark/Flink)": 2
+        },
+        "Deployment, Infrastructure & MLOps": {
+          "Containerization (Docker)": 3,
+          "Orchestration (Kubernetes)": 3,
+          "Cloud Platforms (AWS/GCP/Azure)": 3,
+          "CI/CD Pipelines (GitHub Actions/GitLab CI)": 3,
+          "Model Tracking & Registry (MLflow/WandB)": 2,
+          "Model Serving (Triton/FastAPI/Ollama)": 2,
+          "Observability & Monitoring (Prometheus/Grafana)": 3
+        },
+        "Testing, QA & Model Validation": {
+          "Software Testing (Unit, Integration)": 2,
+          "AI Evaluation, Validation & Benchmarking": 1,
+          "Claim Normalization & Fact-Checking Logic": 0
+        },
+        "Business, Security & AI Governance": {
+          "Technical Writing & Communication": 2,
+          "Agile / Scrum Methodologies": 2,
+          "AI Security, Jailbreak Defense & Data Privacy": 2,
+          "AI Ethics, Governance & Bias Mitigation": 1
+        }
+      },
+      "roadmap": "Foundation: Linux, Networking, Security Fundamentals, Git\nCloud Core: AWS, Azure, GCP\nInfrastructure: Terraform, CloudFormation, Pulumi\nContainerization: Docker, Kubernetes\nCloud Services: EC2, Lambda, S3, RDS, Azure Functions, GKE\nAdvanced Cloud: High Availability, Disaster Recovery, Cost Optimization\nMonitoring: CloudWatch, Grafana, Prometheus"
+    },
+    {
+      "id": "IT-ROLE-011",
+      "role": "DevOps Engineer",
+      "description": "Thiết lập và duy trì quy trình CI/CD nhằm tự động hóa việc kiểm thử và triển khai phần mềm; tối ưu hóa tốc độ đưa các tính năng mới lên môi trường thực tế một cách an toàn và tin cậy.",
+      "skill_scores": {
+        "Programming & Software Foundations": {
+          "Python (Core & Async)": 2,
+          "C++ (Performance Optimization)": 1,
+          "SQL (Data Extraction & Querying)": 2,
+          "OOP & Design Patterns": 2,
+          "Data Structures & Algorithms": 2
+        },
+        "Frontend & Interactive Interfaces": {
+          "HTML5 / CSS3 / Tailwind": 0,
+          "JavaScript / TypeScript": 1,
+          "Frontend Frameworks (React/Vue/Angular)": 0,
+          "AI Demo UIs (Streamlit/Gradio/Chainlit)": 0,
+          "UI / UX Design": 0
+        },
+        "Backend & Architectural Engineering": {
+          "API Development (FastAPI/Express/Django)": 2,
+          "Microservices Architecture": 3,
+          "Message Brokers (Kafka/RabbitMQ)": 2,
+          "Relational Databases (PostgreSQL/MySQL)": 2,
+          "NoSQL Databases (MongoDB/Redis)": 2,
+          "Vector Databases (Milvus/Pinecone/Qdrant)": 1
+        },
+        "Modeling, Deep Learning & Algorithms": {
+          "Mathematics & Statistics (Linear Algebra, Calculus)": 1,
+          "Machine Learning Theory & Scikit-Learn": 1,
+          "Deep Learning Frameworks (PyTorch)": 1,
+          "Deep Learning Frameworks (TensorFlow/Keras)": 1,
+          "Computer Vision (OpenCV, I3D, YOLO)": 0,
+          "Traditional NLP (HMM, Core NLP Techniques)": 0,
+          "Generative AI, LLMs & Prompt Engineering": 1,
+          "Retrieval-Augmented Generation (RAG) Systems": 1,
+          "Agentic AI & Multi-Agent Frameworks (LangChain/Autogen)": 1
+        },
+        "Data Pipelines & Big Data Systems": {
+          "Data Wrangling & Feature Engineering (Pandas/NumPy)": 1,
+          "Data Pipeline Orchestration (Airflow/Prefect)": 2,
+          "Data Transformation & Warehouse (dbt/BigQuery)": 2,
+          "Big Data Processing (Spark/Flink)": 2
+        },
+        "Deployment, Infrastructure & MLOps": {
+          "Containerization (Docker)": 3,
+          "Orchestration (Kubernetes)": 3,
+          "Cloud Platforms (AWS/GCP/Azure)": 3,
+          "CI/CD Pipelines (GitHub Actions/GitLab CI)": 3,
+          "Model Tracking & Registry (MLflow/WandB)": 2,
+          "Model Serving (Triton/FastAPI/Ollama)": 2,
+          "Observability & Monitoring (Prometheus/Grafana)": 3
+        },
+        "Testing, QA & Model Validation": {
+          "Software Testing (Unit, Integration)": 3,
+          "AI Evaluation, Validation & Benchmarking": 2,
+          "Claim Normalization & Fact-Checking Logic": 0
+        },
+        "Business, Security & AI Governance": {
+          "Technical Writing & Communication": 2,
+          "Agile / Scrum Methodologies": 2,
+          "AI Security, Jailbreak Defense & Data Privacy": 2,
+          "AI Ethics, Governance & Bias Mitigation": 1
+        }
+      },
+      "roadmap": "Foundation: Linux, Networking, Bash Scripting, Git\nAutomation: Python, Shell Script\nCI/CD: Jenkins, GitHub Actions, GitLab CI/CD\nContainerization: Docker, Kubernetes\nInfrastructure as Code: Terraform, Ansible\nMonitoring & Logging: Prometheus, Grafana, ELK Stack, Loki\nCloud Platforms: AWS, Azure, GCP"
+    },
+    {
+      "id": "IT-ROLE-012",
+      "role": "Security Engineer",
+      "description": "Đảm bảo an toàn thông tin cho toàn bộ nền tảng; thiết kế các lớp bảo mật dữ liệu cá nhân cho hồ sơ ứng viên và ngăn chặn các cuộc tấn công mạng nhắm vào hệ thống lưu trữ đám mây.",
+      "skill_scores": {
+        "Programming & Software Foundations": {
+          "Python (Core & Async)": 2,
+          "C++ (Performance Optimization)": 1,
+          "SQL (Data Extraction & Querying)": 1,
+          "OOP & Design Patterns": 2,
+          "Data Structures & Algorithms": 2
+        },
+        "Frontend & Interactive Interfaces": {
+          "HTML5 / CSS3 / Tailwind": 0,
+          "JavaScript / TypeScript": 1,
+          "Frontend Frameworks (React/Vue/Angular)": 0,
+          "AI Demo UIs (Streamlit/Gradio/Chainlit)": 0,
+          "UI / UX Design": 0
+        },
+        "Backend & Architectural Engineering": {
+          "API Development (FastAPI/Express/Django)": 1,
+          "Microservices Architecture": 2,
+          "Message Brokers (Kafka/RabbitMQ)": 1,
+          "Relational Databases (PostgreSQL/MySQL)": 1,
+          "NoSQL Databases (MongoDB/Redis)": 1,
+          "Vector Databases (Milvus/Pinecone/Qdrant)": 1
+        },
+        "Modeling, Deep Learning & Algorithms": {
+          "Mathematics & Statistics (Linear Algebra, Calculus)": 1,
+          "Machine Learning Theory & Scikit-Learn": 1,
+          "Deep Learning Frameworks (PyTorch)": 1,
+          "Deep Learning Frameworks (TensorFlow/Keras)": 1,
+          "Computer Vision (OpenCV, I3D, YOLO)": 0,
+          "Traditional NLP (HMM, Core NLP Techniques)": 0,
+          "Generative AI, LLMs & Prompt Engineering": 1,
+          "Retrieval-Augmented Generation (RAG) Systems": 1,
+          "Agentic AI & Multi-Agent Frameworks (LangChain/Autogen)": 1
+        },
+        "Data Pipelines & Big Data Systems": {
+          "Data Wrangling & Feature Engineering (Pandas/NumPy)": 1,
+          "Data Pipeline Orchestration (Airflow/Prefect)": 1,
+          "Data Transformation & Warehouse (dbt/BigQuery)": 1,
+          "Big Data Processing (Spark/Flink)": 1
+        },
+        "Deployment, Infrastructure & MLOps": {
+          "Containerization (Docker)": 2,
+          "Orchestration (Kubernetes)": 2,
+          "Cloud Platforms (AWS/GCP/Azure)": 2,
+          "CI/CD Pipelines (GitHub Actions/GitLab CI)": 2,
+          "Model Tracking & Registry (MLflow/WandB)": 1,
+          "Model Serving (Triton/FastAPI/Ollama)": 1,
+          "Observability & Monitoring (Prometheus/Grafana)": 2
+        },
+        "Testing, QA & Model Validation": {
+          "Software Testing (Unit, Integration)": 2,
+          "AI Evaluation, Validation & Benchmarking": 1,
+          "Claim Normalization & Fact-Checking Logic": 1
+        },
+        "Business, Security & AI Governance": {
+          "Technical Writing & Communication": 2,
+          "Agile / Scrum Methodologies": 2,
+          "AI Security, Jailbreak Defense & Data Privacy": 3,
+          "AI Ethics, Governance & Bias Mitigation": 2
+        }
+      },
+      "roadmap": "Foundation: Linux, Networking, Operating Systems, Programming Basics\nSecurity Fundamentals: Cryptography, Authentication, Authorization\nApplication Security: OWASP Top 10, Secure Coding, SAST, DAST\nNetwork Security: Firewalls, IDS/IPS, VPN\nCloud Security: IAM, Secrets Management, Zero Trust\nOffensive Security: Penetration Testing, Threat Modeling, Incident Response\nTools: Burp Suite, Wireshark, Metasploit, Nmap"
+    },
+    {
+      "id": "IT-ROLE-013",
+      "role": "Game Developer",
+      "description": "Ứng dụng các yếu tố trò chơi hóa (Gamification) vào lộ trình phát triển kỹ năng; thiết kế các tương tác thú vị giúp người dùng có thêm động lực hoàn thành các khóa học và mục tiêu sự nghiệp trong lộ trình.",
+      "skill_scores": {
+        "Programming & Software Foundations": {
+          "Python (Core & Async)": 1,
+          "C++ (Performance Optimization)": 3,
+          "SQL (Data Extraction & Querying)": 1,
+          "OOP & Design Patterns": 3,
+          "Data Structures & Algorithms": 3
+        },
+        "Frontend & Interactive Interfaces": {
+          "HTML5 / CSS3 / Tailwind": 1,
+          "JavaScript / TypeScript": 1,
+          "Frontend Frameworks (React/Vue/Angular)": 0,
+          "AI Demo UIs (Streamlit/Gradio/Chainlit)": 0,
+          "UI / UX Design": 2
+        },
+        "Backend & Architectural Engineering": {
+          "API Development (FastAPI/Express/Django)": 1,
+          "Microservices Architecture": 1,
+          "Message Brokers (Kafka/RabbitMQ)": 1,
+          "Relational Databases (PostgreSQL/MySQL)": 2,
+          "NoSQL Databases (MongoDB/Redis)": 2,
+          "Vector Databases (Milvus/Pinecone/Qdrant)": 0
+        },
+        "Modeling, Deep Learning & Algorithms": {
+          "Mathematics & Statistics (Linear Algebra, Calculus)": 2,
+          "Machine Learning Theory & Scikit-Learn": 1,
+          "Deep Learning Frameworks (PyTorch)": 1,
+          "Deep Learning Frameworks (TensorFlow/Keras)": 1,
+          "Computer Vision (OpenCV, I3D, YOLO)": 2,
+          "Traditional NLP (HMM, Core NLP Techniques)": 0,
+          "Generative AI, LLMs & Prompt Engineering": 1,
+          "Retrieval-Augmented Generation (RAG) Systems": 0,
+          "Agentic AI & Multi-Agent Frameworks (LangChain/Autogen)": 0
+        },
+        "Data Pipelines & Big Data Systems": {
+          "Data Wrangling & Feature Engineering (Pandas/NumPy)": 1,
+          "Data Pipeline Orchestration (Airflow/Prefect)": 0,
+          "Data Transformation & Warehouse (dbt/BigQuery)": 0,
+          "Big Data Processing (Spark/Flink)": 0
+        },
+        "Deployment, Infrastructure & MLOps": {
+          "Containerization (Docker)": 2,
+          "Orchestration (Kubernetes)": 1,
+          "Cloud Platforms (AWS/GCP/Azure)": 1,
+          "CI/CD Pipelines (GitHub Actions/GitLab CI)": 2,
+          "Model Tracking & Registry (MLflow/WandB)": 0,
+          "Model Serving (Triton/FastAPI/Ollama)": 0,
+          "Observability & Monitoring (Prometheus/Grafana)": 1
+        },
+        "Testing, QA & Model Validation": {
+          "Software Testing (Unit, Integration)": 2,
+          "AI Evaluation, Validation & Benchmarking": 0,
+          "Claim Normalization & Fact-Checking Logic": 0
+        },
+        "Business, Security & AI Governance": {
+          "Technical Writing & Communication": 2,
+          "Agile / Scrum Methodologies": 2,
+          "AI Security, Jailbreak Defense & Data Privacy": 1,
+          "AI Ethics, Governance & Bias Mitigation": 0
+        }
+      },
+      "roadmap": "Foundation: C++, C#, OOP, Mathematics, Physics\nGame Engines: Unity, Unreal Engine\nGraphics Programming: OpenGL, DirectX, Shader Programming\nGameplay Development: Character Systems, Animation, Physics Engine\nAI in Games: Pathfinding, Behavior Trees, NPC Systems\nAdvanced Development: Multiplayer Networking, Optimization\nDeployment: Steam, Google Play, App Store, Console Platforms"
+    },
+    {
+      "id": "IT-ROLE-014",
+      "role": "Embedding Engineer",
+      "description": "Chuyên trách việc chuyển đổi dữ liệu văn bản từ CV và JD thành các vector không gian (Embeddings); tối ưu hóa thuật toán tìm kiếm ngữ nghĩa để nâng cao độ chính xác cho việc đối chiếu năng lực ứng viên.",
+      "skill_scores": {
+        "Programming & Software Foundations": {
+          "Python (Core & Async)": 3,
+          "C++ (Performance Optimization)": 3,
+          "SQL (Data Extraction & Querying)": 1,
+          "OOP & Design Patterns": 2,
+          "Data Structures & Algorithms": 3
+        },
+        "Frontend & Interactive Interfaces": {
+          "HTML5 / CSS3 / Tailwind": 0,
+          "JavaScript / TypeScript": 0,
+          "Frontend Frameworks (React/Vue/Angular)": 0,
+          "AI Demo UIs (Streamlit/Gradio/Chainlit)": 1,
+          "UI / UX Design": 0
+        },
+        "Backend & Architectural Engineering": {
+          "API Development (FastAPI/Express/Django)": 1,
+          "Microservices Architecture": 1,
+          "Message Brokers (Kafka/RabbitMQ)": 1,
+          "Relational Databases (PostgreSQL/MySQL)": 1,
+          "NoSQL Databases (MongoDB/Redis)": 1,
+          "Vector Databases (Milvus/Pinecone/Qdrant)": 3
+        },
+        "Modeling, Deep Learning & Algorithms": {
+          "Mathematics & Statistics (Linear Algebra, Calculus)": 2,
+          "Machine Learning Theory & Scikit-Learn": 2,
+          "Deep Learning Frameworks (PyTorch)": 3,
+          "Deep Learning Frameworks (TensorFlow/Keras)": 2,
+          "Computer Vision (OpenCV, I3D, YOLO)": 1,
+          "Traditional NLP (HMM, Core NLP Techniques)": 2,
+          "Generative AI, LLMs & Prompt Engineering": 3,
+          "Retrieval-Augmented Generation (RAG) Systems": 3,
+          "Agentic AI & Multi-Agent Frameworks (LangChain/Autogen)": 3
+        },
+        "Data Pipelines & Big Data Systems": {
+          "Data Wrangling & Feature Engineering (Pandas/NumPy)": 2,
+          "Data Pipeline Orchestration (Airflow/Prefect)": 1,
+          "Data Transformation & Warehouse (dbt/BigQuery)": 1,
+          "Big Data Processing (Spark/Flink)": 1
+        },
+        "Deployment, Infrastructure & MLOps": {
+          "Containerization (Docker)": 2,
+          "Orchestration (Kubernetes)": 1,
+          "Cloud Platforms (AWS/GCP/Azure)": 2,
+          "CI/CD Pipelines (GitHub Actions/GitLab CI)": 1,
+          "Model Tracking & Registry (MLflow/WandB)": 2,
+          "Model Serving (Triton/FastAPI/Ollama)": 3,
+          "Observability & Monitoring (Prometheus/Grafana)": 1
+        },
+        "Testing, QA & Model Validation": {
+          "Software Testing (Unit, Integration)": 1,
+          "AI Evaluation, Validation & Benchmarking": 2,
+          "Claim Normalization & Fact-Checking Logic": 2
+        },
+        "Business, Security & AI Governance": {
+          "Technical Writing & Communication": 2,
+          "Agile / Scrum Methodologies": 1,
+          "AI Security, Jailbreak Defense & Data Privacy": 3,
+          "AI Ethics, Governance & Bias Mitigation": 2
+        }
+      },
+      "roadmap": "Foundation: Python, Machine Learning, NLP Fundamentals, Statistics\nEmbedding Models: Sentence Transformers, BGE, E5, Instructor\nRetrieval Systems: BM25, Dense Retrieval, Hybrid Search\nVector Databases: Milvus, Qdrant, Pinecone, Weaviate\nRanking Systems: Cross Encoder, Cohere Rerank, BGE Reranker\nRAG Systems: LangChain, LlamaIndex, DSPy\nEvaluation: Precision@K, Recall@K, MRR, nDCG, RAGAS\nDeployment: FastAPI, Docker, Kubernetes"
+    },
+    {
+      "id": "IT-ROLE-015",
+      "role": "Project Manager",
+      "description": "Lập kế hoạch, quản lý tiến độ và nguồn lực cho dự án; điều phối các nhóm chức năng khác nhau để đảm bảo sản phẩm được ra mắt đúng hạn (MVP) và bám sát lộ trình phát triển kinh doanh.",
+      "skill_scores": {
+        "Programming & Software Foundations": {
+          "Python (Core & Async)": 1,
+          "C++ (Performance Optimization)": 0,
+          "SQL (Data Extraction & Querying)": 1,
+          "OOP & Design Patterns": 1,
+          "Data Structures & Algorithms": 1
+        },
+        "Frontend & Interactive Interfaces": {
+          "HTML5 / CSS3 / Tailwind": 1,
+          "JavaScript / TypeScript": 1,
+          "Frontend Frameworks (React/Vue/Angular)": 1,
+          "AI Demo UIs (Streamlit/Gradio/Chainlit)": 1,
+          "UI / UX Design": 2
+        },
+        "Backend & Architectural Engineering": {
+          "API Development (FastAPI/Express/Django)": 1,
+          "Microservices Architecture": 2,
+          "Message Brokers (Kafka/RabbitMQ)": 1,
+          "Relational Databases (PostgreSQL/MySQL)": 1,
+          "NoSQL Databases (MongoDB/Redis)": 1,
+          "Vector Databases (Milvus/Pinecone/Qdrant)": 1
+        },
+        "Modeling, Deep Learning & Algorithms": {
+          "Mathematics & Statistics (Linear Algebra, Calculus)": 1,
+          "Machine Learning Theory & Scikit-Learn": 1,
+          "Deep Learning Frameworks (PyTorch)": 0,
+          "Deep Learning Frameworks (TensorFlow/Keras)": 0,
+          "Computer Vision (OpenCV, I3D, YOLO)": 0,
+          "Traditional NLP (HMM, Core NLP Techniques)": 0,
+          "Generative AI, LLMs & Prompt Engineering": 2,
+          "Retrieval-Augmented Generation (RAG) Systems": 1,
+          "Agentic AI & Multi-Agent Frameworks (LangChain/Autogen)": 1
+        },
+        "Data Pipelines & Big Data Systems": {
+          "Data Wrangling & Feature Engineering (Pandas/NumPy)": 1,
+          "Data Pipeline Orchestration (Airflow/Prefect)": 1,
+          "Data Transformation & Warehouse (dbt/BigQuery)": 1,
+          "Big Data Processing (Spark/Flink)": 1
+        },
+        "Deployment, Infrastructure & MLOps": {
+          "Containerization (Docker)": 1,
+          "Orchestration (Kubernetes)": 1,
+          "Cloud Platforms (AWS/GCP/Azure)": 2,
+          "CI/CD Pipelines (GitHub Actions/GitLab CI)": 1,
+          "Model Tracking & Registry (MLflow/WandB)": 1,
+          "Model Serving (Triton/FastAPI/Ollama)": 1,
+          "Observability & Monitoring (Prometheus/Grafana)": 1
+        },
+        "Testing, QA & Model Validation": {
+          "Software Testing (Unit, Integration)": 1,
+          "AI Evaluation, Validation & Benchmarking": 1,
+          "Claim Normalization & Fact-Checking Logic": 1
+        },
+        "Business, Security & AI Governance": {
+          "Technical Writing & Communication": 3,
+          "Agile / Scrum Methodologies": 3,
+          "AI Security, Jailbreak Defense & Data Privacy": 2,
+          "AI Ethics, Governance & Bias Mitigation": 2
+        }
+      },
+      "roadmap": "Foundation: SDLC, Agile, Scrum, Kanban\nProject Planning: Scope Management, Resource Planning, Budgeting\nTools: Jira, Confluence, Microsoft Project, Trello\nLeadership: Communication, Negotiation, Conflict Resolution\nRisk Management: Risk Assessment, Change Management\nStakeholder Management: Product Strategy, Requirement Prioritization\nMetrics & Reporting: KPI, OKR, Project Analytics"
+    }
+  ]
+}

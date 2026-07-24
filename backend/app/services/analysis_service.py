@@ -12,6 +12,7 @@ from pymongo.errors import ConfigurationError, PyMongoError, ServerSelectionTime
 
 from app.services.cv_service import STANDARD_SECTIONS, format_file_size, normalize_search_text
 from app.services.gpt_service import evaluate_sections_with_gpt, normalize_list
+from app.services.role_dataset import load_default_roles
 
 
 SCORING_CONFIG_VERSION = "baseline-role-weighted-v1"
@@ -143,6 +144,22 @@ ROLE_ICON_LABELS = {
     "NG_QA": "QA",
 }
 
+LEGACY_ROLE_ID_ALIASES = {
+    "NG_BACKEND": "IT-ROLE-001",
+    "NG_FRONTEND": "IT-ROLE-002",
+    "NG_FULLSTACK": "IT-ROLE-003",
+    "NG_DATA": "IT-ROLE-007",
+}
+
+try:
+    DATASET_ROLES = load_default_roles()
+except Exception:
+    DATASET_ROLES = []
+
+if DATASET_ROLES:
+    DEFAULT_ROLES = DATASET_ROLES
+    ROLE_ICON_LABELS = {role["role_id"]: role.get("icon_label", "IT") for role in DEFAULT_ROLES}
+
 DATABASE_ERRORS = (ConfigurationError, PyMongoError, ServerSelectionTimeoutError)
 
 DEMO_CV = {
@@ -187,21 +204,27 @@ def normalize_role_document(document: dict[str, Any], skills: list[dict[str, Any
         if str(document.get("TrangThai", document.get("status", "active"))).lower() in {"active", "hoat dong", "hoạt động"}
         else "inactive",
         "skills": skills or document.get("skills", []),
-        "icon_label": ROLE_ICON_LABELS.get(str(role_id), "IT"),
+        "icon_label": document.get("IconLabel") or ROLE_ICON_LABELS.get(str(role_id), "IT"),
+        "roadmap": document.get("Roadmap") or document.get("roadmap", ""),
     }
 
 
 async def list_career_roles(db: Any) -> list[dict[str, Any]]:
     roles_by_id = {role["role_id"]: role for role in DEFAULT_ROLES}
+    dataset_role_id_by_name = {normalize_search_text(role["name"]): role["role_id"] for role in DEFAULT_ROLES}
 
     try:
         cursor = db["NGANHNGHIET"].find({}).sort("TenNganh", 1)
-        documents = await cursor.to_list(length=100)
+        documents = await cursor.to_list(length=500)
     except Exception:
         documents = []
 
     for document in documents:
         role = normalize_role_document(document)
+        dataset_role_id = dataset_role_id_by_name.get(normalize_search_text(str(role["name"] or "")))
+        if dataset_role_id and dataset_role_id != role["role_id"]:
+            continue
+
         fallback = roles_by_id.get(role["role_id"], {})
         role["skills"] = fallback.get("skills", role["skills"])
         role["icon_label"] = ROLE_ICON_LABELS.get(str(role["role_id"]), "IT")
@@ -211,9 +234,10 @@ async def list_career_roles(db: Any) -> list[dict[str, Any]]:
 
 
 async def get_role_by_id(db: Any, role_id: str) -> dict[str, Any]:
+    resolved_role_id = LEGACY_ROLE_ID_ALIASES.get(role_id, role_id)
     roles = await list_career_roles(db)
     for role in roles:
-        if role["role_id"] == role_id:
+        if role["role_id"] == resolved_role_id:
             return role
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
@@ -705,6 +729,7 @@ async def create_analysis_for_cv(
         )
 
     role = await get_role_by_id(db, role_id)
+    canonical_role_id = role["role_id"]
     analysis = analyze_sections(cv=cv, role=role)
     now = datetime.now(timezone.utc)
     analysis_id = f"KQ_{uuid4().hex[:10].upper()}"
@@ -717,7 +742,7 @@ async def create_analysis_for_cv(
         "NhanXetTQ": analysis["summary"],
         "ThoiDiemPT": now,
         "MaCV": cv_id,
-        "MaNganh": role_id,
+        "MaNganh": canonical_role_id,
         "DiemBoCuc": criteria_map.get("layout"),
         "DiemNoiDung": criteria_map.get("content"),
         "DiemTuKhoa": criteria_map.get("keywords"),
@@ -739,7 +764,7 @@ async def create_analysis_for_cv(
     try:
         await db["CV"].update_one(
             {"_id": cv_id, "MaKH": user_id},
-            {"$set": {"TrangThai": "completed", "MaNganh": role_id, "NgayCapNhat": now}},
+            {"$set": {"TrangThai": "completed", "MaNganh": canonical_role_id, "NgayCapNhat": now}},
         )
         await db["KETQUA_PTCV"].insert_one(result_document)
         await db["LICHSUPTCV"].insert_one(
@@ -754,7 +779,7 @@ async def create_analysis_for_cv(
             },
         ) from exc
 
-    updated_cv = {**cv, "TrangThai": "completed", "MaNganh": role_id}
+    updated_cv = {**cv, "TrangThai": "completed", "MaNganh": canonical_role_id}
     return format_analysis_result(result_document, updated_cv, role)
 
 
@@ -884,7 +909,8 @@ async def get_analysis_detail(
         result = await db["KETQUA_PTCV"].find_one({"_id": analysis_id})
     except DATABASE_ERRORS as exc:
         if analysis_id == "KQ001" and user_id == "KH001":
-            role = next(role for role in DEFAULT_ROLES if role["role_id"] == "NG_FRONTEND")
+            demo_role_id = LEGACY_ROLE_ID_ALIASES.get("NG_FRONTEND", "NG_FRONTEND")
+            role = next((role for role in DEFAULT_ROLES if role["role_id"] == demo_role_id), DEFAULT_ROLES[0])
             return format_analysis_result(DEMO_RESULT, DEMO_CV, role)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

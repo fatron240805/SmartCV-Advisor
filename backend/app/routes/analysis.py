@@ -5,7 +5,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from app.db import db  # Import instance kết nối MongoDB
 from app.routes.dependencies import get_current_user
-from app.services.analysis_service import DATABASE_ERRORS, get_analysis_detail, get_role_by_id
+from app.services.analysis_service import (
+    DATABASE_ERRORS,
+    LEGACY_ROLE_ID_ALIASES,
+    get_analysis_detail,
+    get_role_by_id,
+    list_career_roles,
+)
 
 router = APIRouter(prefix="/api/v1/analyses", tags=["Analysis"])
 
@@ -81,6 +87,14 @@ async def get_analysis_history(
     for item in history_list:
         if hasattr(item["created_at"], "isoformat"):
             item["created_at"] = item["created_at"].isoformat()
+
+    if any(not item.get("role_name") and item.get("role_id") for item in history_list):
+        roles = await list_career_roles(db)
+        role_name_by_id = {role["role_id"]: role["name"] for role in roles}
+        for item in history_list:
+            if not item.get("role_name") and item.get("role_id"):
+                resolved_role_id = LEGACY_ROLE_ID_ALIASES.get(item["role_id"], item["role_id"])
+                item["role_name"] = role_name_by_id.get(resolved_role_id)
 
     # BR2: Registered User chỉ xem được số lượng kết quả giới hạn (Ví dụ: 3 CV gần nhất)
     if user["current_plan"] != "premium":

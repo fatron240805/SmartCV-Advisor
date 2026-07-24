@@ -8,6 +8,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo import ASCENDING
 
 from app.services.auth_service import hash_password
+from app.services.role_dataset import build_role_seed_documents
 
 
 load_dotenv()
@@ -35,6 +36,7 @@ async def main():
         db = client[MONGODB_DB]
 
         now = datetime.now(timezone.utc)
+        role_seed_documents = build_role_seed_documents(now)
 
         # =============================================================
         # DANH SÁCH COLLECTION VÀ DỮ LIỆU MẪU
@@ -292,30 +294,7 @@ async def main():
             # ---------------------------------------------------------
             {
                 "name": "NGANHNGHIET",
-                "documents": [
-                    {
-                        "_id": "NG_FRONTEND",
-                        "TenNganh": "Frontend Developer",
-                        "MoTa": (
-                            "Phát triển giao diện web với HTML, CSS, "
-                            "JavaScript và các thư viện frontend."
-                        ),
-                        "NgayTao": now,
-                        "NgayCapNhat": None,
-                        "TrangThai": "hoat dong",
-                    },
-                    {
-                        "_id": "NG_BACKEND",
-                        "TenNganh": "Backend Developer",
-                        "MoTa": (
-                            "Phát triển API, xử lý nghiệp vụ, cơ sở dữ liệu "
-                            "và các dịch vụ phía máy chủ."
-                        ),
-                        "NgayTao": now,
-                        "NgayCapNhat": None,
-                        "TrangThai": "hoat dong",
-                    },
-                ],
+                "documents": role_seed_documents["roles"],
             },
 
             # ---------------------------------------------------------
@@ -323,48 +302,7 @@ async def main():
             # ---------------------------------------------------------
             {
                 "name": "KYNANG",
-                "documents": [
-                    {
-                        "_id": "KN_REACT",
-                        "TenKyNang": "ReactJS",
-                        "MoTa": "Thư viện xây dựng giao diện web.",
-                        "NgayTao": now,
-                        "NgayCapNhat": None,
-                        "TrangThai": "hoat dong",
-                    },
-                    {
-                        "_id": "KN_REST_API",
-                        "TenKyNang": "REST API",
-                        "MoTa": "Thiết kế và sử dụng API theo kiến trúc REST.",
-                        "NgayTao": now,
-                        "NgayCapNhat": None,
-                        "TrangThai": "hoat dong",
-                    },
-                    {
-                        "_id": "KN_GIT",
-                        "TenKyNang": "Git",
-                        "MoTa": "Quản lý phiên bản mã nguồn.",
-                        "NgayTao": now,
-                        "NgayCapNhat": None,
-                        "TrangThai": "hoat dong",
-                    },
-                    {
-                        "_id": "KN_PYTHON",
-                        "TenKyNang": "Python",
-                        "MoTa": "Ngôn ngữ lập trình Python.",
-                        "NgayTao": now,
-                        "NgayCapNhat": None,
-                        "TrangThai": "hoat dong",
-                    },
-                    {
-                        "_id": "KN_MONGODB",
-                        "TenKyNang": "MongoDB",
-                        "MoTa": "Cơ sở dữ liệu NoSQL dạng document.",
-                        "NgayTao": now,
-                        "NgayCapNhat": None,
-                        "TrangThai": "hoat dong",
-                    },
-                ],
+                "documents": role_seed_documents["skills"],
             },
 
             # ---------------------------------------------------------
@@ -372,38 +310,7 @@ async def main():
             # ---------------------------------------------------------
             {
                 "name": "NGANHNGHE_KYNANG",
-                "documents": [
-                    {
-                        "_id": "NNKN_FRONTEND_REACT",
-                        "MaNganh": "NG_FRONTEND",
-                        "MaKyNang": "KN_REACT",
-                    },
-                    {
-                        "_id": "NNKN_FRONTEND_REST",
-                        "MaNganh": "NG_FRONTEND",
-                        "MaKyNang": "KN_REST_API",
-                    },
-                    {
-                        "_id": "NNKN_FRONTEND_GIT",
-                        "MaNganh": "NG_FRONTEND",
-                        "MaKyNang": "KN_GIT",
-                    },
-                    {
-                        "_id": "NNKN_BACKEND_PYTHON",
-                        "MaNganh": "NG_BACKEND",
-                        "MaKyNang": "KN_PYTHON",
-                    },
-                    {
-                        "_id": "NNKN_BACKEND_MONGODB",
-                        "MaNganh": "NG_BACKEND",
-                        "MaKyNang": "KN_MONGODB",
-                    },
-                    {
-                        "_id": "NNKN_BACKEND_REST",
-                        "MaNganh": "NG_BACKEND",
-                        "MaKyNang": "KN_REST_API",
-                    },
-                ],
+                "documents": role_seed_documents["role_skills"],
             },
 
             # ---------------------------------------------------------
@@ -411,48 +318,7 @@ async def main():
             # ---------------------------------------------------------
             {
                 "name": "DIEMDANHGIA",
-                "documents": [
-                    {
-                        "_id": "DDG_REACT",
-                        "MaKyNang": "KN_REACT",
-                        "Diem": 3.0,
-                        "TrongSo": 25.0,
-                        "MucDo": "Core Skill",
-                        "NgayCapNhat": now,
-                    },
-                    {
-                        "_id": "DDG_REST_API",
-                        "MaKyNang": "KN_REST_API",
-                        "Diem": 2.0,
-                        "TrongSo": 15.0,
-                        "MucDo": "Important",
-                        "NgayCapNhat": now,
-                    },
-                    {
-                        "_id": "DDG_GIT",
-                        "MaKyNang": "KN_GIT",
-                        "Diem": 2.0,
-                        "TrongSo": 10.0,
-                        "MucDo": "Important",
-                        "NgayCapNhat": now,
-                    },
-                    {
-                        "_id": "DDG_PYTHON",
-                        "MaKyNang": "KN_PYTHON",
-                        "Diem": 3.0,
-                        "TrongSo": 25.0,
-                        "MucDo": "Core Skill",
-                        "NgayCapNhat": now,
-                    },
-                    {
-                        "_id": "DDG_MONGODB",
-                        "MaKyNang": "KN_MONGODB",
-                        "Diem": 2.0,
-                        "TrongSo": 15.0,
-                        "MucDo": "Important",
-                        "NgayCapNhat": now,
-                    },
-                ],
+                "documents": role_seed_documents["skill_scores"],
             },
 
             # ---------------------------------------------------------
