@@ -240,11 +240,10 @@ Không thêm các module quản trị ngoài ba nhóm Use Case đã đặc tả.
 3. Hệ thống chuyển đến màn hình Đăng ký hoặc Đăng nhập.
 4. Nếu chọn đăng ký, Guest nhập họ tên, email, mật khẩu và xác nhận mật khẩu.
 5. Guest đọc và đồng ý với Điều khoản sử dụng cùng Chính sách quyền riêng tư.
-6. Hệ thống tạo tài khoản Registered User và gửi email xác thực.
-7. Hệ thống hiển thị thông báo yêu cầu kiểm tra email, kèm tùy chọn **“Gửi lại email xác thực”**.
-8. Người dùng mở liên kết xác thực; hệ thống kích hoạt tài khoản và chuyển đến trang Đăng nhập.
-9. Người dùng đăng nhập thành công.
-10. Hệ thống xác định vai trò và chuyển đến Dashboard tương ứng.
+6. Hệ thống tạo tài khoản Registered User và kích hoạt tài khoản ngay trong MVP.
+7. Hệ thống chuyển người dùng đến trang Đăng nhập, email có thể được điền sẵn.
+8. Người dùng đăng nhập thành công.
+9. Hệ thống xác định vai trò và chuyển đến Dashboard tương ứng.
 
 ### Luồng B — Phân tích CV lần đầu
 
@@ -358,19 +357,7 @@ Không thêm các module quản trị ngoài ba nhóm Use Case đã đặc tả.
 
 **Trạng thái:** mặc định, đang nhập, thiếu trường bắt buộc, email sai định dạng, email trùng, mật khẩu yếu, mật khẩu không khớp, chưa đồng ý điều khoản, đang xử lý và đăng ký thành công.
 
-### Screen P02A — Xác thực email
-
-**Use Case:** UC 008, sau khi đăng ký thành công.
-
-**Thành phần:**
-
-- Icon email và tiêu đề **“Kiểm tra email của bạn”**.
-- Mô tả: “Chúng tôi đã gửi liên kết xác thực đến `m***@example.com`.”
-- Nút **“Gửi lại email xác thực”**.
-- Trạng thái đếm thời gian trước khi cho gửi lại để tránh nhấn liên tục.
-- Link **“Quay lại đăng nhập”**.
-- Trạng thái xác thực thành công: **“Tài khoản đã được kích hoạt”** và CTA **“Đăng nhập”**.
-- Trạng thái lỗi khi liên kết hết hạn hoặc không hợp lệ, kèm CTA gửi lại email.
+**Ghi chú cập nhật:** UC 008 hiện bỏ qua bước xác thực email trong MVP. Sau khi đăng ký thành công, tài khoản Registered được kích hoạt ngay và hệ thống chuyển người dùng về màn hình đăng nhập.
 
 ### Screen P03 — Đăng nhập
 
@@ -395,7 +382,6 @@ Không thêm các module quản trị ngoài ba nhóm Use Case đã đặc tả.
 **Trạng thái lỗi:**
 
 - “Thông tin đăng nhập không chính xác.”
-- “Tài khoản của bạn chưa được xác thực. Vui lòng kiểm tra email.” kèm nút “Gửi lại email xác thực”.
 - “Tài khoản của bạn đã bị tạm khóa.”
 - Cảnh báo sau nhiều lần nhập sai.
 
@@ -1129,7 +1115,7 @@ Mỗi màn hình quan trọng phải có các trạng thái sau khi phù hợp:
 - Analysis progress phải có state thành công và thất bại.
 - Result page phải có state không tìm thấy bản ghi.
 - Pricing phải có state Guest, Free và Premium.
-- Registration phải có state chờ xác thực email, gửi lại email và liên kết hết hạn.
+- Registration phải có state đăng ký thành công và chuyển về đăng nhập.
 - Login phải có state quên mật khẩu và phiên đăng nhập hết hạn.
 - Thanh toán VNPay mô phỏng phải có state đang xử lý, thành công, thất bại và hủy.
 - Admin table phải có state không có dữ liệu và lỗi tải dữ liệu.
@@ -1315,7 +1301,7 @@ Figma Make nên tạo theo thứ tự sau:
 
 1. Design tokens và component nền tảng.
 2. Landing Page.
-3. Đăng ký, xác thực email, Đăng nhập và đặt lại mật khẩu.
+3. Đăng ký, Đăng nhập và đặt lại mật khẩu.
 4. Dashboard người dùng.
 5. Upload CV.
 6. Chọn vị trí mục tiêu.
@@ -1338,7 +1324,7 @@ Figma Make nên tạo theo thứ tự sau:
 Prototype được xem là đúng yêu cầu khi:
 
 - Người xem có thể đi xuyên suốt luồng từ Landing Page đến kết quả CV.
-- Luồng đăng ký có đồng ý điều khoản, xác thực email và gửi lại email xác thực.
+- Luồng đăng ký có đồng ý điều khoản và chuyển về đăng nhập sau khi tạo tài khoản thành công.
 - Luồng đăng nhập có ghi nhớ đăng nhập, quên mật khẩu và xử lý phiên hết hạn.
 - Có bước đồng ý xử lý dữ liệu trước khi upload.
 - Có chọn vị trí mục tiêu.

@@ -1,37 +1,28 @@
-// export default function HistoryPage() {
-//   return (
-//     <div>
-//       <h1>History Page Placeholder</h1>
-//       <p>Page lịch sử phân tích: để thành viên khác implement danh sách phiên trước.</p>
-//     </div>
-//   );
-// }
-
-// BÊN DƯỚI LÀ ĐKHOA CẬP NHẬT 19/07
-
 import { useEffect, useState } from 'react';
 import { apiService } from '../services/api';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 interface HistoryItem {
   analysis_id: string;
   cv_name: string;
   overall_score: number;
+  classification?: string;
+  role_name?: string;
   created_at: string;
   status: string;
 }
 
 export default function HistoryPage() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [accessLevel, setAccessLevel] = useState<'free' | 'premium'>('free');
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchHistory = async () => {
       try {
-        const result = await apiService.getHistory(10);
-        setHistory(result.data);
-        setAccessLevel(result.access_level);
+        const result = await apiService.getHistory(50);
+        setHistory(result.data || []);
       } catch (error) {
         console.error("Lỗi khi tải lịch sử:", error);
       } finally {
@@ -41,61 +32,110 @@ export default function HistoryPage() {
     fetchHistory();
   }, []);
 
-  if (loading) return <div className="text-center mt-20 text-gray-500">Đang tải dữ liệu...</div>;
+  const filteredHistory = history.filter(item => 
+    item.cv_name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-800">Lịch sử phân tích</h1>
-        {accessLevel === 'free' && (
-          <span className="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-sm font-medium border border-purple-200">
-            Giới hạn: 3 CV gần nhất
-          </span>
-        )}
+    <div className="mx-auto max-w-5xl px-5 py-10">
+      <h1 className="text-3xl font-bold text-slate-900 mb-8">Lịch sử phân tích</h1>
+
+      {/* Search and Filters */}
+      <div className="flex flex-col sm:flex-row gap-4 mb-8">
+        <div className="relative flex-1">
+          <input 
+            type="text" 
+            placeholder="Tìm theo tên file..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full h-12 rounded-2xl border border-slate-200 pl-4 pr-10 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+        </div>
+        <div className="w-full sm:w-48 h-12 rounded-2xl border border-slate-200 bg-white">
+          {/* Placeholder for future filter */}
+        </div>
       </div>
 
-      <div className="grid gap-4">
-        {history.length === 0 ? (
-          <div className="text-center p-10 bg-white rounded-xl border border-gray-100">
-            <p className="text-gray-500">Bạn chưa có kết quả phân tích nào.</p>
-          </div>
-        ) : (
-          history.map((item) => (
-            <div key={item.analysis_id} className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow flex items-center justify-between">
-              <div>
-                <h3 className="font-semibold text-lg text-gray-800 truncate">{item.cv_name}</h3>
-                <p className="text-sm text-gray-500 mt-1">
-                  Phân tích ngày: {new Date(item.created_at).toLocaleDateString('vi-VN')}
-                </p>
-              </div>
-              <div className="flex items-center gap-6">
-                <div className="text-center">
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">Điểm ATS</p>
-                  <p className={`font-bold text-2xl ${item.overall_score >= 70 ? 'text-green-500' : 'text-orange-500'}`}>
-                    {item.overall_score}/100
-                  </p>
-                </div>
-                {/* Nút Xem chi tiết sẽ chuyển hướng tới trang Gợi ý của chính CV đó */}
-                <Link 
-                  to={`/analysis/${item.analysis_id}`}
-                  className="bg-gray-50 hover:bg-gray-100 text-gray-700 px-4 py-2 rounded-lg font-medium transition-colors"
-                >
-                  Xem chi tiết
-                </Link>
-              </div>
-            </div>
-          ))
-        )}
+      {/* Table */}
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-slate-100 text-slate-500 font-semibold tracking-wider">
+                <th className="px-6 py-5 whitespace-nowrap">TÊN FILE</th>
+                <th className="px-6 py-5 whitespace-nowrap">VỊ TRÍ</th>
+                <th className="px-6 py-5 whitespace-nowrap">ĐIỂM</th>
+                <th className="px-6 py-5 whitespace-nowrap">XẾP LOẠI</th>
+                <th className="px-6 py-5 whitespace-nowrap">NGÀY</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {loading ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-10 text-center text-slate-500">
+                    Đang tải dữ liệu...
+                  </td>
+                </tr>
+              ) : filteredHistory.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-10 text-center text-slate-500">
+                    Không tìm thấy kết quả phân tích nào.
+                  </td>
+                </tr>
+              ) : (
+                filteredHistory.map((item) => {
+                  const dateStr = new Date(item.created_at).toLocaleDateString('vi-VN');
+                  
+                  const isGood = item.overall_score >= 70;
+                  const isAverage = item.overall_score >= 50 && item.overall_score < 70;
+                  
+                  const scoreColor = isGood ? 'text-blue-600' : isAverage ? 'text-orange-500' : 'text-red-500';
+                  const classificationBg = isGood ? 'bg-blue-50 border-blue-200 text-blue-600' : isAverage ? 'bg-orange-50 border-orange-200 text-orange-500' : 'bg-red-50 border-red-200 text-red-500';
+                  const classificationText = item.classification || (isGood ? 'Khá' : isAverage ? 'Trung bình' : 'Cần cải thiện');
 
-        {accessLevel === 'free' && (
-          <div className="bg-gradient-to-r from-purple-50 to-indigo-50 p-6 rounded-xl border border-purple-100 text-center mt-4">
-            <h3 className="font-bold text-purple-900 mb-2">Xem toàn bộ lịch sử phân tích?</h3>
-            <p className="text-purple-700 text-sm mb-4">Nâng cấp Premium để lưu trữ không giới hạn và xem lại các phân tích cũ.</p>
-            <Link to="/plans" className="inline-block bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg font-medium shadow-sm transition-colors">
-              Nâng cấp Premium
-            </Link>
-          </div>
-        )}
+                  return (
+                    <tr key={item.analysis_id} className="hover:bg-slate-50 transition">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-500">
+                            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                          </div>
+                          <span className="font-semibold text-slate-700 truncate max-w-[200px]">{item.cv_name}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-slate-500 font-medium">
+                        {item.role_name || '-'}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`text-xl font-bold ${scoreColor}`}>
+                          {item.overall_score}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex items-center justify-center rounded-full border px-3 py-1 text-[11px] font-bold ${classificationBg}`}>
+                          {classificationText}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center justify-between gap-4 text-slate-500">
+                          <span>{dateStr}</span>
+                          <button
+                            onClick={() => navigate(`/analysis/${item.analysis_id}`)}
+                            className="font-bold text-blue-600 hover:underline"
+                          >
+                            Xem
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

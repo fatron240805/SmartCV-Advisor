@@ -1,21 +1,25 @@
-import { useState } from 'react';
-import { BrowserRouter, Link, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate, Link } from 'react-router-dom';
+import AdminCareerRolesPage from './pages/AdminCareerRolesPage';
+import AdminSkillScoresPage from './pages/AdminSkillScoresPage';
+import AdminUsersPage from './pages/AdminUsersPage';
 import AnalysisResultPage from './pages/AnalysisResultPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import HistoryPage from './pages/HistoryPage';
+import DashboardPage from './pages/DashboardPage';
+import LandingPage from './pages/LandingPage';
 import PlansPage from './pages/PlansPage';
 import ProfilePage from './pages/ProfilePage';
 import RegisterPage from './pages/RegisterPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import LoginPage from './pages/LoginPage';
 import UploadCvPage from './pages/UploadCvPage';
-import VerifyEmailPage from './pages/VerifyEmailPage';
 import { apiService, clearAuthSession, getStoredAuthSession, getStoredAuthUser } from './services/api';
 
 const navigationItems = [
   { label: 'Tổng quan', path: '/', icon: 'grid' },
   { label: 'Phân tích CV', path: '/upload', icon: 'upload' },
-  { label: 'Lịch sử phân tích', path: '/', icon: 'clock' },
+  { label: 'Lịch sử phân tích', path: '/history', icon: 'clock' },
   { label: 'Gói dịch vụ', path: '/plans', icon: 'card' },
   { label: 'Hồ sơ cá nhân', path: '/profile', icon: 'user' },
 ];
@@ -61,9 +65,11 @@ function AppShell() {
   const navigate = useNavigate();
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [quota, setQuota] = useState<{ remaining: number | null; limit: number | null; unlimited: boolean; current_plan_id?: string; expiry?: string | null } | null>(null);
   const storedUser = getStoredAuthUser();
-  const displayName = storedUser?.full_name ?? 'Trần Minh An';
-  const displayPlan = storedUser?.account_type === 'premium' ? 'Gói Premium' : 'Gói Free';
+  const displayName = storedUser?.full_name ?? 'Người dùng';
+  const isPremium = quota?.unlimited === true;
+  const displayPlan = isPremium ? 'Gói Premium' : 'Gói Free';
   const initial = (displayName.trim()[0] || 'T').toUpperCase();
   const isAnalysisFlow = location.pathname.startsWith('/upload') || location.pathname.startsWith('/analysis');
   const pageTitle = isAnalysisFlow
@@ -73,6 +79,15 @@ function AppShell() {
       : location.pathname === '/profile'
         ? 'Hồ sơ cá nhân'
         : 'Tổng quan';
+
+  // Refresh quota mỗi khi navigate sang trang mới
+  useEffect(() => {
+    if (storedUser) {
+      apiService.getQuota()
+        .then(res => setQuota(res.data))
+        .catch(console.error);
+    }
+  }, [location.pathname]);
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -104,15 +119,14 @@ function AppShell() {
             const active =
               item.path === '/upload'
                 ? isAnalysisFlow
-                : item.path === location.pathname && item.label !== 'Lịch sử phân tích';
-            const historyActive = item.label === 'Lịch sử phân tích' && location.pathname === '/';
+                : item.path === location.pathname;
             return (
               <Link
                 key={`${item.label}-${item.path}`}
                 to={item.path}
                 className={[
                   'flex min-h-12 items-center gap-3 rounded-2xl px-4 font-medium transition',
-                  active || historyActive
+                  active
                     ? 'bg-blue-50 text-blue-600'
                     : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700',
                 ].join(' ')}
@@ -125,24 +139,46 @@ function AppShell() {
         </nav>
 
         <div className="space-y-4 border-t border-slate-200 p-4">
-          <div className="rounded-2xl border border-purple-100 bg-purple-50 p-4 text-sm">
-            <p className="font-bold text-purple-700">Premium — Job Search Pass</p>
-            <p className="mt-1 text-purple-500">Hết hạn: 09/08/2026</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="grid h-10 w-10 place-items-center rounded-full bg-blue-100 font-bold text-blue-600">{initial}</span>
-            <div>
-              <p className="font-semibold text-slate-900">{displayName}</p>
-              <p className="text-sm text-slate-400">{displayPlan}</p>
+          {!isPremium ? (
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="mb-2 text-sm text-slate-500">
+                Còn <span className="font-bold text-slate-900">{quota ? `${quota.remaining}/${quota.limit} lượt` : '... lượt'}</span> phân tích
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                <div className="h-full rounded-full bg-blue-600" style={{ width: quota?.limit ? `${(1 - (quota.remaining || 0) / quota.limit) * 100}%` : '0%' }} />
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-blue-500 bg-blue-600 p-4 text-sm text-white shadow-sm">
+              <p className="font-bold">Premium — Job Search Pass</p>
+              <p className="mt-1 text-blue-100">
+                {quota?.current_plan_id === 'DV_PREMIUM_90' ? '90 ngày' : '30 ngày'}
+              </p>
+            </div>
+          )}
+          <div className="flex items-center gap-3 px-2">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-blue-100 font-bold text-blue-600">
+              {initial}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-semibold text-slate-900">{displayName}</p>
+              <p className="truncate text-xs text-slate-400">{displayPlan}</p>
             </div>
             <button
               aria-label="Đăng xuất"
-              className="ml-auto grid h-10 w-10 place-items-center rounded-full text-slate-400 hover:bg-slate-50 hover:text-red-600"
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
               type="button"
               onClick={() => setShowLogoutDialog(true)}
             >
               <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
-                <path d="M10 7V5a2 2 0 0 1 2-2h7v18h-7a2 2 0 0 1-2-2v-2M3 12h11m0 0-3-3m3 3-3 3" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                <path
+                  d="M10 7V5a2 2 0 0 1 2-2h7v18h-7a2 2 0 0 1-2-2v-2M3 12h11m0 0-3-3m3 3-3 3"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
             </button>
           </div>
@@ -170,7 +206,8 @@ function AppShell() {
         </header>
 
         <Routes>
-          <Route path="/" element={<HistoryPage />} />
+          <Route path="/" element={<DashboardPage />} />
+          <Route path="/history" element={<HistoryPage />} />
           <Route path="/upload" element={<UploadCvPage />} />
           <Route path="/analysis/:id" element={<AnalysisResultPage />} />
           <Route path="/plans" element={<PlansPage />} />
@@ -212,22 +249,50 @@ function AppShell() {
 
 function AppRoutes() {
   const location = useLocation();
+  const storedUser = getStoredAuthUser();
   const authPath = [
     '/login',
     '/register',
-    '/verify-email',
     '/forgot-password',
     '/reset-password',
   ].includes(location.pathname);
+  const adminPath = location.pathname.startsWith('/admin');
 
   if (authPath) {
     return (
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
-        <Route path="/verify-email" element={<VerifyEmailPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
+      </Routes>
+    );
+  }
+
+  if (storedUser?.role === 'admin' || adminPath) {
+    if (storedUser?.role !== 'admin') {
+      return (
+        <Routes>
+          <Route path="*" element={<Navigate replace to="/login" />} />
+        </Routes>
+      );
+    }
+    return (
+      <Routes>
+        <Route path="/admin/roles" element={<AdminCareerRolesPage />} />
+        <Route path="/admin/skills" element={<AdminSkillScoresPage />} />
+        <Route path="/admin/users" element={<AdminUsersPage />} />
+        <Route path="*" element={<Navigate replace to="/admin/roles" />} />
+      </Routes>
+    );
+  }
+
+  // Guest (chưa đăng nhập): hiển thị Landing Page tại '/', redirect về '/' cho mọi route khác
+  if (!storedUser) {
+    return (
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="*" element={<Navigate replace to="/" />} />
       </Routes>
     );
   }

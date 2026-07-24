@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import uuid4
 
+# pyrefly: ignore [missing-import]
 from fastapi import HTTPException, status
+# pyrefly: ignore [missing-import]
 from pymongo.errors import ConfigurationError, PyMongoError, ServerSelectionTimeoutError
 
 from app.services.cv_service import STANDARD_SECTIONS, format_file_size, normalize_search_text
@@ -212,14 +214,12 @@ def normalize_role_document(document: dict[str, Any], skills: list[dict[str, Any
         if str(document.get("TrangThai", document.get("status", "active"))).lower() in {"active", "hoat dong", "hoạt động"}
         else "inactive",
         "skills": skills or document.get("skills", []),
-        "icon_label": document.get("IconLabel") or ROLE_ICON_LABELS.get(str(role_id), "IT"),
-        "roadmap": document.get("Roadmap") or document.get("roadmap", ""),
+        "icon_label": ROLE_ICON_LABELS.get(str(role_id), "IT"),
     }
 
 
 async def list_career_roles(db: Any) -> list[dict[str, Any]]:
     roles_by_id = {role["role_id"]: role for role in DEFAULT_ROLES}
-    dataset_role_id_by_name = {normalize_search_text(role["name"]): role["role_id"] for role in DEFAULT_ROLES}
 
     try:
         cursor = db["NGANHNGHIET"].find({}).sort("TenNganh", 1)
@@ -227,18 +227,21 @@ async def list_career_roles(db: Any) -> list[dict[str, Any]]:
     except Exception:
         documents = []
 
+    # Nếu DB trống → dùng DEFAULT_ROLES làm fallback toàn bộ
+    if not documents:
+        return [dict(role) for role in DEFAULT_ROLES]
+
+    # Nếu DB có dữ liệu → chỉ trả về roles từ DB
+    # (skills được bổ sung từ DEFAULT_ROLES nếu DB chưa có)
+    db_roles: list[dict[str, Any]] = []
     for document in documents:
         role = normalize_role_document(document)
-        dataset_role_id = dataset_role_id_by_name.get(normalize_search_text(str(role["name"] or "")))
-        if dataset_role_id and dataset_role_id != role["role_id"]:
-            continue
-
         fallback = roles_by_id.get(role["role_id"], {})
         role["skills"] = fallback.get("skills", role["skills"])
         role["icon_label"] = ROLE_ICON_LABELS.get(str(role["role_id"]), "IT")
-        roles_by_id[role["role_id"]] = role
+        db_roles.append(role)
 
-    return sorted(roles_by_id.values(), key=lambda item: item["name"])
+    return sorted(db_roles, key=lambda item: item["name"])
 
 
 async def get_role_by_id(db: Any, role_id: str) -> dict[str, Any]:
@@ -863,12 +866,132 @@ def analyze_sections(
         "strengths": strengths,
         "weaknesses": weaknesses[:4],
         "priority_actions": priority_actions,
-        "readiness_level": readiness_level,
         "scoring_config_version": SCORING_CONFIG_VERSION,
         "model_version": gpt_review.model_version if gpt_review else "rule-based-local",
         "prompt_version": gpt_review.prompt_version if gpt_review else None,
         "analysis_method": "gpt" if gpt_review else "rule_based",
     }
+
+
+DEFAULT_FREE_PLAN_ID = "DV_FREE"
+DEFAULT_PREMIUM_PLAN_ID = "DV_PREMIUM_30"
+
+
+async def resolve_quota_state(db: Any, user_id: str, now: datetime) -> dict[str, Any]:
+    """Đọc (và nếu cần, tự làm mới) trạng thái gói dịch vụ hiện tại của user.
+
+    - Nếu LUOTDUNG hiện có còn hạn: dùng nguyên gói đó.
+    - Nếu hết hạn hoặc chưa từng có: tự cấp gói DV_FREE mới cho chu kỳ tiếp theo,
+      rồi đọc lại đúng bản ghi vừa tạo/đang có để lấy limit + NgayBatDau khớp với
+      gói thực sự đang áp dụng (tránh dùng nhầm limit/period_start của gói cũ).
+    """
+    customer = await db["KHACHHANG"].find_one({"_id": user_id})
+    account_type = str((customer or {}).get("LoaiKH", "registered")).lower()
+    is_premium = account_type == "premium"
+
+    usage_doc = await db["LUOTDUNG"].find_one({"MaKH": user_id}, sort=[("HanSuDung", -1)])
+    han_su_dung = usage_doc.get("HanSuDung") if usage_doc else None
+    is_active = bool(han_su_dung) and han_su_dung.replace(tzinfo=None) >= now.replace(tzinfo=None)
+
+    if is_premium:
+        # Premium: luôn không giới hạn.
+        # Đọc đúng plan_id thực tế từ LUOTDUNG (DV_PREMIUM_30 hoặc DV_PREMIUM_90).
+        # Nếu usage_doc không có hoặc không phải premium plan thì fallback về DEFAULT.
+        PREMIUM_PLAN_IDS = {"DV_PREMIUM_30", "DV_PREMIUM_90"}
+        actual_plan_id = (
+            usage_doc.get("MaGoiDV")
+            if usage_doc and usage_doc.get("MaGoiDV") in PREMIUM_PLAN_IDS
+            else DEFAULT_PREMIUM_PLAN_ID
+        )
+        return {
+            "account_type": account_type,
+            "plan_id": actual_plan_id,
+            "limit": -1,
+            "is_unlimited": True,
+            "period_start": now.replace(tzinfo=None),
+        }
+
+    if not usage_doc or not is_active:
+        # Registered - gói hết hạn hoặc chưa có → cấp/làm mới chu kỳ Free.
+        await db["LUOTDUNG"].update_one(
+            {"MaKH": user_id, "MaGoiDV": DEFAULT_FREE_PLAN_ID},
+            {
+                "$set": {
+                    "MaKH": user_id,
+                    "MaGoiDV": DEFAULT_FREE_PLAN_ID,
+                    "NgayBatDau": now,
+                    "HanSuDung": now + timedelta(days=30),
+                },
+                "$setOnInsert": {
+                    "_id": f"LD_{uuid4().hex[:10].upper()}",
+                },
+            },
+            upsert=True,
+        )
+        usage_doc = await db["LUOTDUNG"].find_one({"MaKH": user_id, "MaGoiDV": DEFAULT_FREE_PLAN_ID})
+        plan_id = DEFAULT_FREE_PLAN_ID
+    else:
+        plan_id = usage_doc.get("MaGoiDV") or DEFAULT_FREE_PLAN_ID
+
+    goidv_doc = await db["GOIDV"].find_one({"_id": plan_id})
+    limit = int(goidv_doc.get("SoLuotPhanTich", 3)) if goidv_doc else 3
+    is_unlimited = limit == -1
+
+    ngay_bat_dau = usage_doc.get("NgayBatDau") if usage_doc else None
+    if ngay_bat_dau:
+        period_start = ngay_bat_dau.replace(tzinfo=None) if hasattr(ngay_bat_dau, "replace") else ngay_bat_dau
+    else:
+        period_start = now.replace(tzinfo=None) - timedelta(days=30)
+
+    return {
+        "account_type": account_type,
+        "plan_id": plan_id,
+        "limit": limit,
+        "is_unlimited": is_unlimited,
+        "period_start": period_start,
+    }
+
+
+async def ensure_analysis_quota_available(db: Any, user_id: str) -> dict[str, Any]:
+    """Kiểm tra lượt phân tích còn lại; raise 403 ANALYSIS_QUOTA_EXCEEDED nếu đã hết.
+
+    Dùng làm "cổng chặn" chung cho cả hai nơi:
+    - Upload CV (chặn sớm, không cho tải file mới lên nếu đã hết lượt).
+    - Tạo phân tích (chặn cuối, phòng trường hợp quota bị dùng hết giữa lúc
+      upload và lúc bấm phân tích).
+
+    Lưu ý: đây là kiểm tra dạng "đếm rồi so sánh" (count-then-compare), không
+    atomic tuyệt đối trước race condition khi có nhiều request đồng thời. Với
+    quy mô nhỏ hiện tại là chấp nhận được, nhưng nếu cần chặn tuyệt đối thì nên
+    chuyển sang counter tăng nguyên tử (increment-with-condition) trên LUOTDUNG.
+    """
+    now = datetime.now(timezone.utc)
+    try:
+        state = await resolve_quota_state(db, user_id, now)
+    except DATABASE_ERRORS:
+        # Giữ hành vi cũ: không chặn nếu DB lỗi khi kiểm tra lượt.
+        return {"unlimited": True, "limit": None, "used": None}
+
+    if state["is_unlimited"]:
+        return {"unlimited": True, "limit": None, "used": None}
+
+    try:
+        used = await db["LICHSUPTCV"].count_documents(
+            {"MaKH": user_id, "NgayPT": {"$gte": state["period_start"]}}
+        )
+    except DATABASE_ERRORS:
+        return {"unlimited": False, "limit": state["limit"], "used": None}
+
+    if used >= state["limit"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "ANALYSIS_QUOTA_EXCEEDED",
+                "message": f"Bạn đã dùng hết {state['limit']} lượt phân tích. Vui lòng gia hạn hoặc nâng cấp gói.",
+            },
+        )
+
+    return {"unlimited": False, "limit": state["limit"], "used": used}
 
 
 async def create_analysis_for_cv(
@@ -937,6 +1060,14 @@ async def create_analysis_for_cv(
         "PromptVersion": analysis["prompt_version"],
         "AnalysisMethod": analysis["analysis_method"],
     }
+
+    # -----------------------------------------------------------
+    # Kiểm tra lượt dùng (LUOTDUNG / GOIDV / LICHSUPTCV)
+    # Dùng chung với bước chặn upload CV — xem ensure_analysis_quota_available().
+    # Đây là lớp chặn thứ 2 (defense-in-depth): phòng trường hợp quota bị dùng
+    # hết giữa lúc CV được tải lên và lúc người dùng bấm "Phân tích".
+    # -----------------------------------------------------------
+    await ensure_analysis_quota_available(db, user_id)
 
     try:
         await db["CV"].update_one(

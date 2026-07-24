@@ -3,9 +3,10 @@ import asyncio
 from datetime import datetime, timedelta, timezone
 
 from bson.decimal128 import Decimal128
+# pyrefly: ignore [missing-import]
 from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
-from pymongo import ASCENDING
+from pymongo import ASCENDING, DESCENDING
 
 from app.services.auth_service import hash_password
 from app.services.role_dataset import build_role_seed_documents
@@ -159,7 +160,7 @@ async def main():
                         "SoLuotPhanTich": 3,
                         "HanSuDung": 30,
                         "QuyenLoi": (
-                            "3 lượt phân tích mỗi tháng; xem điểm tổng quan; "
+                            "3 lượt phân tích; xem điểm tổng quan; "
                             "xem lỗi phổ biến và gợi ý cải thiện tổng quan."
                         ),
                         "NgayTao": now,
@@ -169,8 +170,8 @@ async def main():
                     {
                         "_id": "DV_PREMIUM_30",
                         "TenGoi": "Premium - Job Search Pass 30 ngày",
-                        "Gia": Decimal128("99000.00"),
-                        "SoLuotPhanTich": 20,
+                        "Gia": Decimal128("199000.00"),
+                        "SoLuotPhanTich": -1,
                         "HanSuDung": 30,
                         "QuyenLoi": (
                             "Phân tích CV nâng cao; xem gợi ý chi tiết; "
@@ -183,8 +184,8 @@ async def main():
                     {
                         "_id": "DV_PREMIUM_90",
                         "TenGoi": "Premium - Job Search Pass 90 ngày",
-                        "Gia": Decimal128("297000.00"),
-                        "SoLuotPhanTich": 30,
+                        "Gia": Decimal128("389000.00"),
+                        "SoLuotPhanTich": -1,
                         "HanSuDung": 90,
                         "QuyenLoi": (
                             "Phân tích CV nâng cao; xem gợi ý chi tiết; "
@@ -259,31 +260,25 @@ async def main():
 
             # ---------------------------------------------------------
             # 7. LUOTDUNG
+            # Chỉ lưu thông tin đăng ký gói dịch vụ (MaGoiDV, HanSuDung).
+            # Số lượt đã dùng được đếm trực tiếp từ LICHSUPTCV với index.
             # ---------------------------------------------------------
             {
                 "name": "LUOTDUNG",
                 "documents": [
                     {
                         "_id": "LD001",
-                        "SoLuongDaDung": 1,
-                        "GioiHanTheoDoi": 3,
-                        "ThoiDiemSuDung": now,
-                        "HanSuDung": now + timedelta(days=30),
-                        "QuyenLoi": (
-                            "Phân tích CV cơ bản và xem gợi ý tổng quan."
-                        ),
                         "MaKH": "KH001",
+                        "MaGoiDV": "DV_FREE",
+                        "NgayBatDau": now,
+                        "HanSuDung": now + timedelta(days=30),
                     },
                     {
                         "_id": "LD002",
-                        "SoLuongDaDung": 4,
-                        "GioiHanTheoDoi": 30,
-                        "ThoiDiemSuDung": now,
-                        "HanSuDung": now + timedelta(days=30),
-                        "QuyenLoi": (
-                            "Xem gợi ý chi tiết và câu mẫu Premium."
-                        ),
                         "MaKH": "KH002",
+                        "MaGoiDV": "DV_PREMIUM_30",
+                        "NgayBatDau": now,
+                        "HanSuDung": now + timedelta(days=30),
                     },
                 ],
             },
@@ -294,7 +289,30 @@ async def main():
             # ---------------------------------------------------------
             {
                 "name": "NGANHNGHIET",
-                "documents": role_seed_documents["roles"],
+                "documents": [
+                    {
+                        "_id": "NG_FRONTEND",
+                        "TenNganh": "Frontend Developer",
+                        "MoTa": (
+                            "Phát triển giao diện web với HTML, CSS, "
+                            "JavaScript và các thư viện frontend."
+                        ),
+                        "NgayTao": now,
+                        "NgayCapNhat": None,
+                        "TrangThai": "hoat dong",
+                    },
+                    {
+                        "_id": "NG_BACKEND",
+                        "TenNganh": "Backend Developer",
+                        "MoTa": (
+                            "Phát triển API, xử lý nghiệp vụ, cơ sở dữ liệu "
+                            "và các dịch vụ phía máy chủ."
+                        ),
+                        "NgayTao": now,
+                        "NgayCapNhat": None,
+                        "TrangThai": "hoat dong",
+                    },
+                ],
             },
 
             # ---------------------------------------------------------
@@ -302,7 +320,48 @@ async def main():
             # ---------------------------------------------------------
             {
                 "name": "KYNANG",
-                "documents": role_seed_documents["skills"],
+                "documents": [
+                    {
+                        "_id": "KN_REACT",
+                        "TenKyNang": "ReactJS",
+                        "MoTa": "Thư viện xây dựng giao diện web.",
+                        "NgayTao": now,
+                        "NgayCapNhat": None,
+                        "TrangThai": "hoat dong",
+                    },
+                    {
+                        "_id": "KN_REST_API",
+                        "TenKyNang": "REST API",
+                        "MoTa": "Thiết kế và sử dụng API theo kiến trúc REST.",
+                        "NgayTao": now,
+                        "NgayCapNhat": None,
+                        "TrangThai": "hoat dong",
+                    },
+                    {
+                        "_id": "KN_GIT",
+                        "TenKyNang": "Git",
+                        "MoTa": "Quản lý phiên bản mã nguồn.",
+                        "NgayTao": now,
+                        "NgayCapNhat": None,
+                        "TrangThai": "hoat dong",
+                    },
+                    {
+                        "_id": "KN_PYTHON",
+                        "TenKyNang": "Python",
+                        "MoTa": "Ngôn ngữ lập trình Python.",
+                        "NgayTao": now,
+                        "NgayCapNhat": None,
+                        "TrangThai": "hoat dong",
+                    },
+                    {
+                        "_id": "KN_MONGODB",
+                        "TenKyNang": "MongoDB",
+                        "MoTa": "Cơ sở dữ liệu NoSQL dạng document.",
+                        "NgayTao": now,
+                        "NgayCapNhat": None,
+                        "TrangThai": "hoat dong",
+                    },
+                ],
             },
 
             # ---------------------------------------------------------
@@ -518,10 +577,14 @@ async def main():
             ],
             "DIEMDANHGIA": [
                 (
-                    [("MaKyNang", ASCENDING)],
+                    [
+                        ("MaNganh", ASCENDING),
+                        ("MaKyNang", ASCENDING),
+                    ],
                     {
                         "unique": True,
-                        "name": "uq_diemdanhgia_makynang",
+                        "sparse": True,
+                        "name": "uq_diemdanhgia_manganh_makynang",
                     },
                 )
             ],
@@ -551,7 +614,7 @@ async def main():
                 (
                     [
                         ("MaKH", ASCENDING),
-                        ("NgayPT", ASCENDING),
+                        ("NgayPT", DESCENDING),
                     ],
                     {
                         "name": "idx_lichsu_khachhang_ngay",
@@ -617,9 +680,25 @@ async def main():
 
             collection = db[collection_name]
 
-            # Tạo index
+            if collection_name == "DIEMDANHGIA":
+                existing_indexes = await collection.list_indexes().to_list(length=50)
+                if any(index.get("name") == "uq_diemdanhgia_makynang" for index in existing_indexes):
+                    await collection.drop_index("uq_diemdanhgia_makynang")
+
+            # Tạo index (xóa index cũ nếu trùng tên nhưng khác cấu hình)
             for keys, options in indexes.get(collection_name, []):
-                await collection.create_index(keys, **options)
+                index_name = options.get("name")
+                if index_name:
+                    try:
+                        await collection.create_index(keys, **options)
+                    except Exception as idx_err:
+                        if "IndexKeySpecsConflict" in str(idx_err) or "already exists" in str(idx_err).lower():
+                            await collection.drop_index(index_name)
+                            await collection.create_index(keys, **options)
+                        else:
+                            raise
+                else:
+                    await collection.create_index(keys, **options)
 
             inserted_count = 0
             updated_count = 0
@@ -634,10 +713,24 @@ async def main():
                     if key != "_id"
                 }
 
+                set_payload = {}
+                set_on_insert_payload = {}
+                for k, v in payload.items():
+                    if k in ("NgayBatDau", "HanSuDung", "NgayDangKy", "NgayTao", "CreatedAt"):
+                        set_on_insert_payload[k] = v
+                    else:
+                        set_payload[k] = v
+                
+                update_doc = {}
+                if set_payload:
+                    update_doc["$set"] = set_payload
+                if set_on_insert_payload:
+                    update_doc["$setOnInsert"] = set_on_insert_payload
+
                 result = await collection.update_one(
                     {"_id": document_id},
-                    {"$set": payload},
-                    upsert=True,
+                    update_doc,
+                    upsert=True
                 )
 
                 if result.upserted_id is not None:

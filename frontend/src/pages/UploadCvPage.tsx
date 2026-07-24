@@ -111,6 +111,8 @@ export default function UploadCvPage() {
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState('');
   const [progress, setProgress] = useState(0);
+  const [quotaLabel, setQuotaLabel] = useState<string>('...');
+  const [quotaExceeded, setQuotaExceeded] = useState(false);
 
   const selectedRole = roles.find((role) => role.role_id === selectedRoleId) ?? null;
   const fileIsReady = Boolean(selectedFile && !fileError);
@@ -130,7 +132,17 @@ export default function UploadCvPage() {
         setRolesLoading(false);
       }
     };
+    const loadQuota = async () => {
+      try {
+        const result = await apiService.getQuota();
+        setQuotaLabel(result.data.label);
+        setQuotaExceeded(!result.data.unlimited && (result.data.remaining ?? 1) <= 0);
+      } catch {
+        setQuotaLabel('...');
+      }
+    };
     loadRoles();
+    loadQuota();
   }, []);
 
   useEffect(() => {
@@ -218,103 +230,125 @@ export default function UploadCvPage() {
             <h1 className="text-2xl font-bold text-slate-950">Tải CV của bạn lên</h1>
             <p className="mt-2 text-slate-500">PDF, DOC, DOCX hoặc ảnh PNG/JPG/WEBP — tối đa 5 MB</p>
 
-            <div
-              className={[
-                'mt-7 flex min-h-72 flex-col items-center justify-center rounded-2xl border-2 border-dashed px-6 text-center transition',
-                fileError ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50/30',
-              ].join(' ')}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) => {
-                event.preventDefault();
-                handleFile(event.dataTransfer.files[0]);
-              }}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                className="hidden"
-                accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.webp,.bmp"
-                onChange={(event) => handleFile(event.target.files?.[0])}
-              />
-
-              <div className="grid h-14 w-14 place-items-center rounded-2xl bg-blue-50 text-xl font-bold text-blue-600">
-                CV
-              </div>
-              <p className="mt-5 font-semibold text-slate-700">Kéo thả CV vào đây</p>
-              <p className="mt-2 text-sm text-slate-400">hoặc</p>
-              <button
-                type="button"
-                className="mt-5 rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                Chọn tệp CV
-              </button>
-              <p className="mt-4 text-sm text-slate-400">PDF, DOC, DOCX, PNG, JPG, WEBP, BMP · Tối đa 5 MB</p>
-            </div>
-
-            {selectedFile && (
-              <div className="mt-4 flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="font-semibold text-slate-900">{selectedFile.name}</p>
-                  <p className="text-sm text-slate-500">
-                    {getFileExtension(selectedFile.name).toUpperCase()} · {formatLocalFileSize(selectedFile.size)} ·{' '}
-                    {fileError ? 'Chưa hợp lệ' : 'Đã kiểm tra phía trình duyệt'}
-                  </p>
+            {quotaExceeded ? (
+              <div className="mt-7 flex min-h-72 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-amber-200 bg-amber-50 px-6 text-center">
+                <div className="grid h-14 w-14 place-items-center rounded-2xl bg-amber-100 text-2xl">
+                  🚫
                 </div>
+                <p className="mt-5 text-lg font-bold text-amber-800">Bạn đã dùng hết lượt phân tích</p>
+                <p className="mt-2 text-sm text-amber-700">
+                  Gói Free giới hạn tối đa 3 lượt phân tích mỗi chu kỳ.<br />
+                  Nâng cấp lên Premium để phân tích không giới hạn.
+                </p>
                 <button
                   type="button"
-                  className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-white"
-                  onClick={resetFile}
+                  className="mt-6 rounded-xl bg-purple-600 px-6 py-3 font-semibold text-white shadow-sm transition hover:bg-purple-700"
+                  onClick={() => window.location.href = '/plans'}
                 >
-                  Chọn tệp khác
+                  Xem gói Premium
                 </button>
               </div>
+            ) : (
+              <>
+                <div
+                  className={[
+                    'mt-7 flex min-h-72 flex-col items-center justify-center rounded-2xl border-2 border-dashed px-6 text-center transition',
+                    fileError ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50/30',
+                  ].join(' ')}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    handleFile(event.dataTransfer.files[0]);
+                  }}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.webp,.bmp"
+                    onChange={(event) => handleFile(event.target.files?.[0])}
+                  />
+
+                  <div className="grid h-14 w-14 place-items-center rounded-2xl bg-blue-50 text-xl font-bold text-blue-600">
+                    CV
+                  </div>
+                  <p className="mt-5 font-semibold text-slate-700">Kéo thả CV vào đây</p>
+                  <p className="mt-2 text-sm text-slate-400">hoặc</p>
+                  <button
+                    type="button"
+                    className="mt-5 rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    Chọn tệp CV
+                  </button>
+                  <p className="mt-4 text-sm text-slate-400">PDF, DOC, DOCX, PNG, JPG, WEBP, BMP · Tối đa 5 MB</p>
+                </div>
+
+                {selectedFile && (
+                  <div className="mt-4 flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="font-semibold text-slate-900">{selectedFile.name}</p>
+                      <p className="text-sm text-slate-500">
+                        {getFileExtension(selectedFile.name).toUpperCase()} · {formatLocalFileSize(selectedFile.size)} ·{' '}
+                        {fileError ? 'Chưa hợp lệ' : 'Đã kiểm tra phía trình duyệt'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-white"
+                      onClick={resetFile}
+                    >
+                      Chọn tệp khác
+                    </button>
+                  </div>
+                )}
+
+                <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50 p-5">
+                  <p className="text-sm leading-6 text-slate-600">
+                    CV có thể chứa thông tin cá nhân như họ tên, email, số điện thoại, học vấn và kinh nghiệm làm việc.
+                    Hệ thống cần xử lý các dữ liệu này để thực hiện phân tích và đưa ra đề xuất cải thiện CV.
+                  </p>
+                  <label className="mt-4 flex cursor-pointer items-start gap-3 text-sm font-medium text-slate-700">
+                    <input
+                      type="checkbox"
+                      className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                      checked={consentAccepted}
+                      onChange={(event) => setConsentAccepted(event.target.checked)}
+                    />
+                    <span>
+                      Tôi đồng ý cho phép hệ thống xử lý dữ liệu trong CV nhằm phục vụ việc phân tích và đưa ra đề xuất.{' '}
+                      <a className="text-blue-600 hover:underline" href="/privacy">
+                        Chính sách quyền riêng tư
+                      </a>{' '}
+                      ·{' '}
+                      <a className="text-blue-600 hover:underline" href="/terms">
+                        Điều khoản xử lý dữ liệu
+                      </a>
+                    </span>
+                  </label>
+                  {!consentAccepted && (
+                    <p className="mt-3 text-sm font-medium text-amber-600">
+                      Bạn cần đồng ý với chính sách xử lý dữ liệu CV để tiếp tục.
+                    </p>
+                  )}
+                </div>
+
+                {fileError && (
+                  <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+                    {fileError}
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  className="mt-6 w-full rounded-xl bg-blue-600 px-5 py-4 font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+                  disabled={!canUpload}
+                  onClick={handleUpload}
+                >
+                  {uploading ? 'Đang tải CV lên...' : 'Xác nhận và tải CV lên'}
+                </button>
+              </>
             )}
-
-            <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50 p-5">
-              <p className="text-sm leading-6 text-slate-600">
-                CV có thể chứa thông tin cá nhân như họ tên, email, số điện thoại, học vấn và kinh nghiệm làm việc.
-                Hệ thống cần xử lý các dữ liệu này để thực hiện phân tích và đưa ra đề xuất cải thiện CV.
-              </p>
-              <label className="mt-4 flex cursor-pointer items-start gap-3 text-sm font-medium text-slate-700">
-                <input
-                  type="checkbox"
-                  className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                  checked={consentAccepted}
-                  onChange={(event) => setConsentAccepted(event.target.checked)}
-                />
-                <span>
-                  Tôi đồng ý cho phép hệ thống xử lý dữ liệu trong CV nhằm phục vụ việc phân tích và đưa ra đề xuất.{' '}
-                  <a className="text-blue-600 hover:underline" href="/privacy">
-                    Chính sách quyền riêng tư
-                  </a>{' '}
-                  ·{' '}
-                  <a className="text-blue-600 hover:underline" href="/terms">
-                    Điều khoản xử lý dữ liệu
-                  </a>
-                </span>
-              </label>
-              {!consentAccepted && (
-                <p className="mt-3 text-sm font-medium text-amber-600">
-                  Bạn cần đồng ý với chính sách xử lý dữ liệu CV để tiếp tục.
-                </p>
-              )}
-            </div>
-
-            {fileError && (
-              <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-                {fileError}
-              </div>
-            )}
-
-            <button
-              type="button"
-              className="mt-6 w-full rounded-xl bg-blue-600 px-5 py-4 font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
-              disabled={!canUpload}
-              onClick={handleUpload}
-            >
-              {uploading ? 'Đang tải CV lên...' : 'Xác nhận và tải CV lên'}
-            </button>
           </div>
         )}
 
@@ -420,7 +454,7 @@ export default function UploadCvPage() {
               </div>
               <div className="flex items-center justify-between gap-4 py-4">
                 <span className="text-slate-500">Lượt phân tích còn lại</span>
-                <span className="font-semibold text-slate-900">2/3 lượt trong tháng</span>
+                <span className={`font-semibold ${quotaExceeded ? 'text-red-600' : 'text-slate-900'}`}>{quotaLabel}</span>
               </div>
             </div>
 
@@ -432,6 +466,12 @@ export default function UploadCvPage() {
                 <li>✓ Gợi ý hành động theo thứ tự ưu tiên</li>
               </ul>
             </div>
+
+            {quotaExceeded && (
+              <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-700">
+                Bạn đã dùng hết lượt phân tích. Nâng cấp Premium để tiếp tục.
+              </div>
+            )}
 
             {analysisError && (
               <div className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
@@ -449,7 +489,8 @@ export default function UploadCvPage() {
               </button>
               <button
                 type="button"
-                className="rounded-xl bg-blue-600 px-5 py-4 font-semibold text-white shadow-sm transition hover:bg-blue-700"
+                className="rounded-xl bg-blue-600 px-5 py-4 font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+                disabled={quotaExceeded}
                 onClick={handleCreateAnalysis}
               >
                 Bắt đầu phân tích

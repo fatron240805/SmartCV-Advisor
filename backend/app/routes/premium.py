@@ -1,27 +1,159 @@
-"""Routes for premium user features."""
+"""Routes for premium user features and service plans."""
 
-# Định nghĩa route cho các chức năng chỉ dành cho Premium User.
+from __future__ import annotations
 
+from typing import Any
+
+# pyrefly: ignore [missing-import]
 from fastapi import APIRouter
+
+from app.db import db
 
 router = APIRouter(prefix="/api/v1/service-plans", tags=["Plans"])
 
+
+PLANS = [
+    {
+        "plan_id": "DV_FREE",
+        "name": "Free",
+        "price": 0,
+        "duration_days": None,
+        "analysis_limit": 3,
+        "features": [
+            "3 lượt phân tích",
+            "Điểm tổng quan và 5 tiêu chí",
+            "Danh sách lỗi phổ biến",
+            "Gợi ý cải thiện tổng quan",
+            "Lịch sử phân tích",
+        ],
+        "coming_soon": [],
+    },
+    {
+        "plan_id": "DV_PREMIUM_30",
+        "name": "Premium — Job Search Pass",
+        "price": 199000,
+        "duration_days": 30,
+        "analysis_limit": 20,
+        "features": [
+            "Không giới hạn lượt phân tích",
+            "Gợi ý chi tiết chuyên sâu",
+            "Câu mẫu viết lại theo STAR",
+            "Sao chép nhanh từng câu mẫu",
+            "Tất cả quyền lợi Free",
+        ],
+        "coming_soon": [
+            "Matching Score với JD",
+            "AI Assistant (30 lượt)",
+            "Tải xuống CV đã chỉnh sửa",
+        ],
+    },
+    {
+        "plan_id": "DV_PREMIUM_90",
+        "name": "Premium — Job Search Pass",
+        "price": 499000,
+        "duration_days": 90,
+        "analysis_limit": 30,
+        "features": [
+            "Không giới hạn lượt phân tích",
+            "Gợi ý chi tiết chuyên sâu",
+            "Câu mẫu viết lại theo STAR",
+            "Sao chép nhanh từng câu mẫu",
+            "Tất cả quyền lợi Free",
+        ],
+        "coming_soon": [
+            "Matching Score với JD",
+            "AI Assistant (30 lượt)",
+            "Tải xuống CV đã chỉnh sửa",
+        ],
+    },
+]
+
+
 @router.get("", summary="UC-026: Xem gói dịch vụ")
-async def get_service_plans():
-    # BR4: Giá dịch vụ được lấy từ hệ thống quản trị
+async def get_service_plans() -> dict[str, Any]:
+    """Trả về danh sách gói dịch vụ từ GOIDV collection, fallback sang hardcoded nếu DB chưa có."""
+    try:
+        db_plans = await db["GOIDV"].find({}).to_list(length=20)
+    except Exception:
+        db_plans = []
+
+    if db_plans:
+        result = []
+        for plan in db_plans:
+            plan_id = plan.get("_id", "")
+            price_raw = plan.get("Gia", 0)
+            try:
+                price = float(str(price_raw))
+            except Exception:
+                price = 0.0
+            result.append(
+                {
+                    "plan_id": plan_id,
+                    "name": plan.get("TenGoi", ""),
+                    "price": int(price),
+                    "duration_days": plan.get("HanSuDung"),
+                    "analysis_limit": plan.get("SoLuotPhanTich"),
+                    "features": [f.strip() for f in (plan.get("QuyenLoi") or "").split(";") if f.strip()],
+                    "coming_soon": [],
+                }
+            )
+        return {"data": result}
+
+    # Fallback: trả về danh sách hardcoded đầy đủ cả 30 và 90 ngày
     return {
         "data": [
             {
-                "plan_id": "DV_FREE", 
-                "name": "Free", 
-                "price": 0, 
-                "features": ["3 lượt phân tích/tháng", "Xem điểm tổng quan", "Xem lỗi phổ biến", "Lưu 3 lịch sử CV"]
+                "plan_id": "DV_FREE",
+                "name": "Free",
+                "price": 0,
+                "duration_days": None,
+                "analysis_limit": 3,
+                "features": [
+                    "3 lượt phân tích",
+                    "Điểm tổng quan và 5 tiêu chí",
+                    "Danh sách lỗi phổ biến",
+                    "Gợi ý cải thiện tổng quan",
+                    "Lịch sử phân tích",
+                ],
+                "coming_soon": [],
             },
             {
-                "plan_id": "DV_PREMIUM_30", 
-                "name": "Premium - 30 Ngày", 
-                "price": 99000, 
-                "features": ["Phân tích CV nâng cao", "Gợi ý chi tiết & Câu mẫu chuẩn ATS", "Sao chép nhanh (1-click)", "Lịch sử không giới hạn"]
-            }
+                "plan_id": "DV_PREMIUM_30",
+                "name": "Premium — Job Search Pass",
+                "price": 199000,
+                "duration_days": 30,
+                "analysis_limit": 20,
+                "features": [
+                    "Không giới hạn lượt phân tích",
+                    "Gợi ý chi tiết chuyên sâu",
+                    "Câu mẫu viết lại theo STAR",
+                    "Sao chép nhanh từng câu mẫu",
+                    "Tất cả quyền lợi Free",
+                ],
+                "coming_soon": [
+                    "Matching Score với JD",
+                    "AI Assistant (30 lượt)",
+                    "Tải xuống CV đã chỉnh sửa",
+                ],
+            },
+            {
+                "plan_id": "DV_PREMIUM_90",
+                "name": "Premium — Job Search Pass",
+                "price": 499000,
+                "duration_days": 90,
+                "analysis_limit": 30,
+                "features": [
+                    "Không giới hạn lượt phân tích",
+                    "Gợi ý chi tiết chuyên sâu",
+                    "Câu mẫu viết lại theo STAR",
+                    "Sao chép nhanh từng câu mẫu",
+                    "Tất cả quyền lợi Free",
+                ],
+                "coming_soon": [
+                    "Matching Score với JD",
+                    "AI Assistant (30 lượt)",
+                    "Tải xuống CV đã chỉnh sửa",
+                ],
+            },
         ]
     }
