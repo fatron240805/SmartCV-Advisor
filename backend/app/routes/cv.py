@@ -9,7 +9,12 @@ from pydantic import BaseModel, Field
 
 from app.db import db
 from app.routes.dependencies import get_current_user
-from app.services.analysis_service import DATABASE_ERRORS, create_analysis_for_cv, list_career_roles
+from app.services.analysis_service import (
+    DATABASE_ERRORS,
+    create_analysis_for_cv,
+    ensure_analysis_quota_available,
+    list_career_roles,
+)
 from app.services.cv_service import CONSENT_POLICY_VERSION, build_cv_document, public_cv_metadata
 
 
@@ -35,6 +40,12 @@ async def upload_cv(
     policy_version: str = Form(CONSENT_POLICY_VERSION),
     user: dict[str, str] = Depends(get_current_user),
 ) -> dict[str, Any]:
+    # BR: user (free/registered) đã dùng hết lượt phân tích trong chu kỳ hiện tại
+    # thì không được tải thêm CV mới lên nữa. Chặn ở đây (trước khi đọc/xử lý file)
+    # để tránh tốn chi phí trích xuất text/OCR/GPT cho một CV chắc chắn không
+    # phân tích được. Premium (SoLuotPhanTich = -1) luôn được bỏ qua bước này.
+    await ensure_analysis_quota_available(db, user["user_id"])
+
     content = await file.read()
     cv_document = await build_cv_document(
         file=file,

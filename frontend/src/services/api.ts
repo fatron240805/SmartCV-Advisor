@@ -19,12 +19,12 @@ const apiClient = axios.create({
 });
 
 export function getStoredAuthSession(): AuthSession | null {
-  const raw = window.localStorage.getItem(AUTH_STORAGE_KEY);
+  const raw = window.sessionStorage.getItem(AUTH_STORAGE_KEY);
   if (!raw) return null;
   try {
     return JSON.parse(raw) as AuthSession;
   } catch {
-    window.localStorage.removeItem(AUTH_STORAGE_KEY);
+    window.sessionStorage.removeItem(AUTH_STORAGE_KEY);
     return null;
   }
 }
@@ -34,11 +34,11 @@ export function getStoredAuthUser(): AuthUser | null {
 }
 
 export function saveAuthSession(session: AuthSession) {
-  window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
+  window.sessionStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
 }
 
 export function clearAuthSession() {
-  window.localStorage.removeItem(AUTH_STORAGE_KEY);
+  window.sessionStorage.removeItem(AUTH_STORAGE_KEY);
 }
 
 apiClient.interceptors.request.use((config) => {
@@ -85,6 +85,11 @@ export const apiService = {
     return response.data;
   },
 
+  checkEmail: async (email: string): Promise<{ data: { exists: boolean } }> => {
+    const response = await apiClient.post('/auth/check-email', { email });
+    return response.data;
+  },
+
   forgotPassword: async (email: string): Promise<{ data: { message: string; demo_reset_token?: string | null; email_masked: string } }> => {
     const response = await apiClient.post('/auth/forgot-password', { email });
     return response.data;
@@ -105,6 +110,21 @@ export const apiService = {
 
   getProfile: async (): Promise<{ data: UserProfile }> => {
     const response = await apiClient.get('/users/me');
+    return response.data;
+  },
+
+  getQuota: async (): Promise<{
+    data: {
+      account_type: string;
+      current_plan_id: string;
+      unlimited: boolean;
+      used: number | null;
+      limit: number | null;
+      remaining: number | null;
+      label: string;
+    };
+  }> => {
+    const response = await apiClient.get('/users/me/quota');
     return response.data;
   },
 

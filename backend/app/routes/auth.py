@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from typing import Any
 
+# pyrefly: ignore [missing-import]
 from fastapi import APIRouter, status
 from pydantic import BaseModel, Field
 
 from app.db import db
 from app.services.auth_service import (
+    find_account_by_email,
     forgot_password,
     login_user,
     logout_user,
@@ -112,3 +114,18 @@ async def reset_password_route(payload: ResetPasswordRequest) -> dict[str, Any]:
         password_confirmation=payload.password_confirmation,
     )
     return {"data": result, "meta": {"next_step": "login"}, "error": None}
+
+
+class CheckEmailRequest(BaseModel):
+    email: str = Field(..., min_length=5, max_length=254)
+
+
+@router.post("/check-email", summary="Guest: Kiểm tra email đã có tài khoản chưa để điều hướng đúng")
+async def check_email(payload: CheckEmailRequest) -> dict[str, Any]:
+    """Trả về exists=True nếu email đã có tài khoản, False nếu chưa.
+    Không lộ bất kỳ thông tin user nào. Dùng cho luồng Guest CTA smart routing."""
+    account = await find_account_by_email(db, payload.email)
+    return {
+        "data": {"exists": account is not None},
+        "error": None,
+    }

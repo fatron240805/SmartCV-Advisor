@@ -76,46 +76,7 @@ pip install fastapi "uvicorn[standard]" python-multipart python-dotenv openai py
 - Poppler Windows: tải Poppler, giải nén và thêm thư mục `bin` vào `PATH`.
 - Sau khi thêm `PATH`, đóng/mở lại terminal rồi chạy backend.
 
-Tạo file `.env` từ mẫu:
 
-```powershell
-Copy-Item .env.example .env
-```
-
-Mở `backend/.env` và điền giá trị thật:
-
-```env
-MONGODB_URI=mongodb://localhost:27017
-MONGODB_DB=smartcv
-MONGODB_SERVER_SELECTION_TIMEOUT_MS=5000
-MONGODB_CONNECT_TIMEOUT_MS=5000
-MONGODB_SOCKET_TIMEOUT_MS=10000
-CORS_ALLOW_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174
-CORS_ALLOW_ORIGIN_REGEX=^http://(localhost|127\.0\.0\.1):517[0-9]$
-JWT_SECRET_KEY=change_me_for_local_dev
-JWT_ALGORITHM=HS256
-ACCESS_TOKEN_MINUTES=30
-REFRESH_TOKEN_DAYS=7
-REMEMBER_ME_REFRESH_DAYS=30
-AUTH_MAX_FAILED_LOGIN_ATTEMPTS=5
-AUTH_TEMP_LOCK_MINUTES=15
-PASSWORD_RESET_TOKEN_MINUTES=30
-OPENAI_API_KEY=your_openai_api_key_here
-OPENAI_MODEL=gpt-4o-mini
-OPENAI_IMAGE_MODEL=gpt-4o-mini
-OPENAI_TIMEOUT_SECONDS=30
-TESSERACT_CMD=
-POPPLER_PATH=
-```
-
-Nếu dùng MongoDB Atlas, thay `MONGODB_URI` bằng connection string Atlas. Nếu dùng key từng nằm trong notebook prototype, nên rotate/revoke key cũ rồi dán key mới vào `.env`.
-
-Nếu đã cài OCR nhưng PowerShell vẫn báo không thấy lệnh, điền đường dẫn cụ thể:
-
-```env
-TESSERACT_CMD=C:\Program Files\Tesseract-OCR\tesseract.exe
-POPPLER_PATH=C:\poppler\Library\bin
-```
 
 ## 2. Seed dữ liệu demo
 
