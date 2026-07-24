@@ -289,30 +289,7 @@ async def main():
             # ---------------------------------------------------------
             {
                 "name": "NGANHNGHIET",
-                "documents": [
-                    {
-                        "_id": "NG_FRONTEND",
-                        "TenNganh": "Frontend Developer",
-                        "MoTa": (
-                            "Phát triển giao diện web với HTML, CSS, "
-                            "JavaScript và các thư viện frontend."
-                        ),
-                        "NgayTao": now,
-                        "NgayCapNhat": None,
-                        "TrangThai": "hoat dong",
-                    },
-                    {
-                        "_id": "NG_BACKEND",
-                        "TenNganh": "Backend Developer",
-                        "MoTa": (
-                            "Phát triển API, xử lý nghiệp vụ, cơ sở dữ liệu "
-                            "và các dịch vụ phía máy chủ."
-                        ),
-                        "NgayTao": now,
-                        "NgayCapNhat": None,
-                        "TrangThai": "hoat dong",
-                    },
-                ],
+                "documents": role_seed_documents["roles"],
             },
 
             # ---------------------------------------------------------
@@ -320,48 +297,7 @@ async def main():
             # ---------------------------------------------------------
             {
                 "name": "KYNANG",
-                "documents": [
-                    {
-                        "_id": "KN_REACT",
-                        "TenKyNang": "ReactJS",
-                        "MoTa": "Thư viện xây dựng giao diện web.",
-                        "NgayTao": now,
-                        "NgayCapNhat": None,
-                        "TrangThai": "hoat dong",
-                    },
-                    {
-                        "_id": "KN_REST_API",
-                        "TenKyNang": "REST API",
-                        "MoTa": "Thiết kế và sử dụng API theo kiến trúc REST.",
-                        "NgayTao": now,
-                        "NgayCapNhat": None,
-                        "TrangThai": "hoat dong",
-                    },
-                    {
-                        "_id": "KN_GIT",
-                        "TenKyNang": "Git",
-                        "MoTa": "Quản lý phiên bản mã nguồn.",
-                        "NgayTao": now,
-                        "NgayCapNhat": None,
-                        "TrangThai": "hoat dong",
-                    },
-                    {
-                        "_id": "KN_PYTHON",
-                        "TenKyNang": "Python",
-                        "MoTa": "Ngôn ngữ lập trình Python.",
-                        "NgayTao": now,
-                        "NgayCapNhat": None,
-                        "TrangThai": "hoat dong",
-                    },
-                    {
-                        "_id": "KN_MONGODB",
-                        "TenKyNang": "MongoDB",
-                        "MoTa": "Cơ sở dữ liệu NoSQL dạng document.",
-                        "NgayTao": now,
-                        "NgayCapNhat": None,
-                        "TrangThai": "hoat dong",
-                    },
-                ],
+                "documents": role_seed_documents["skills"],
             },
 
             # ---------------------------------------------------------

@@ -220,6 +220,7 @@ def normalize_role_document(document: dict[str, Any], skills: list[dict[str, Any
 
 async def list_career_roles(db: Any) -> list[dict[str, Any]]:
     roles_by_id = {role["role_id"]: role for role in DEFAULT_ROLES}
+    merged_roles = {role_id: dict(role) for role_id, role in roles_by_id.items()}
 
     try:
         cursor = db["NGANHNGHIET"].find({}).sort("TenNganh", 1)
@@ -227,21 +228,38 @@ async def list_career_roles(db: Any) -> list[dict[str, Any]]:
     except Exception:
         documents = []
 
-    # Nếu DB trống → dùng DEFAULT_ROLES làm fallback toàn bộ
-    if not documents:
-        return [dict(role) for role in DEFAULT_ROLES]
+    canonical_document_ids = {
+        str(document.get("_id") or document.get("role_id"))
+        for document in documents
+        if str(document.get("_id") or document.get("role_id")) in roles_by_id
+    }
 
-    # Nếu DB có dữ liệu → chỉ trả về roles từ DB
-    # (skills được bổ sung từ DEFAULT_ROLES nếu DB chưa có)
-    db_roles: list[dict[str, Any]] = []
     for document in documents:
         role = normalize_role_document(document)
-        fallback = roles_by_id.get(role["role_id"], {})
-        role["skills"] = fallback.get("skills", role["skills"])
-        role["icon_label"] = ROLE_ICON_LABELS.get(str(role["role_id"]), "IT")
-        db_roles.append(role)
+        original_role_id = str(role["role_id"])
+        canonical_role_id = LEGACY_ROLE_ID_ALIASES.get(original_role_id, original_role_id)
+        fallback = roles_by_id.get(canonical_role_id)
 
-    return sorted(db_roles, key=lambda item: item["name"])
+        if original_role_id != canonical_role_id and canonical_role_id in canonical_document_ids:
+            continue
+
+        if fallback:
+            merged_role = dict(fallback)
+            merged_role["role_id"] = canonical_role_id
+            merged_role["status"] = role["status"]
+            if original_role_id == canonical_role_id:
+                merged_role["name"] = role["name"] or fallback["name"]
+                merged_role["description"] = role["description"] or fallback["description"]
+                merged_role["skills"] = role["skills"] or fallback.get("skills", [])
+            merged_role["icon_label"] = ROLE_ICON_LABELS.get(canonical_role_id, fallback.get("icon_label", "IT"))
+            merged_roles[canonical_role_id] = merged_role
+            continue
+
+        role["role_id"] = canonical_role_id
+        role["icon_label"] = ROLE_ICON_LABELS.get(canonical_role_id, role.get("icon_label", "IT"))
+        merged_roles[canonical_role_id] = role
+
+    return sorted(merged_roles.values(), key=lambda item: item.get("name") or "")
 
 
 async def get_role_by_id(db: Any, role_id: str) -> dict[str, Any]:
@@ -866,6 +884,7 @@ def analyze_sections(
         "strengths": strengths,
         "weaknesses": weaknesses[:4],
         "priority_actions": priority_actions,
+        "readiness_level": readiness_level,
         "scoring_config_version": SCORING_CONFIG_VERSION,
         "model_version": gpt_review.model_version if gpt_review else "rule-based-local",
         "prompt_version": gpt_review.prompt_version if gpt_review else None,
@@ -1054,7 +1073,7 @@ async def create_analysis_for_cv(
         "Strengths": analysis["strengths"],
         "Weaknesses": analysis["weaknesses"],
         "PriorityActions": analysis["priority_actions"],
-        "ReadinessLevel": analysis["readiness_level"],
+        "ReadinessLevel": analysis.get("readiness_level") or analysis["classification"],
         "ScoringConfigVersion": analysis["scoring_config_version"],
         "ModelVersion": analysis["model_version"],
         "PromptVersion": analysis["prompt_version"],
