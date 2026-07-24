@@ -65,10 +65,11 @@ function AppShell() {
   const navigate = useNavigate();
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
-  const [quota, setQuota] = useState<{ remaining: number | null, limit: number | null, unlimited: boolean } | null>(null);
+  const [quota, setQuota] = useState<{ remaining: number | null; limit: number | null; unlimited: boolean; current_plan_id?: string; expiry?: string | null } | null>(null);
   const storedUser = getStoredAuthUser();
-  const displayName = storedUser?.full_name ?? 'Trần Minh An';
-  const displayPlan = storedUser?.account_type === 'premium' ? 'Gói Premium' : 'Gói Free';
+  const displayName = storedUser?.full_name ?? 'Người dùng';
+  const isPremium = quota?.unlimited === true;
+  const displayPlan = isPremium ? 'Gói Premium' : 'Gói Free';
   const initial = (displayName.trim()[0] || 'T').toUpperCase();
   const isAnalysisFlow = location.pathname.startsWith('/upload') || location.pathname.startsWith('/analysis');
   const pageTitle = isAnalysisFlow
@@ -79,13 +80,14 @@ function AppShell() {
         ? 'Hồ sơ cá nhân'
         : 'Tổng quan';
 
+  // Refresh quota mỗi khi navigate sang trang mới
   useEffect(() => {
     if (storedUser) {
       apiService.getQuota()
         .then(res => setQuota(res.data))
         .catch(console.error);
     }
-  }, []);
+  }, [location.pathname]);
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -137,7 +139,7 @@ function AppShell() {
         </nav>
 
         <div className="space-y-4 border-t border-slate-200 p-4">
-          {storedUser?.account_type !== 'premium' ? (
+          {!isPremium ? (
             <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <div className="mb-2 text-sm text-slate-500">
                 Còn <span className="font-bold text-slate-900">{quota ? `${quota.remaining}/${quota.limit} lượt` : '... lượt'}</span> phân tích
@@ -149,7 +151,9 @@ function AppShell() {
           ) : (
             <div className="rounded-2xl border border-blue-500 bg-blue-600 p-4 text-sm text-white shadow-sm">
               <p className="font-bold">Premium — Job Search Pass</p>
-              <p className="mt-1 text-blue-100">Hết hạn: 09/08/2026</p>
+              <p className="mt-1 text-blue-100">
+                {quota?.current_plan_id === 'DV_PREMIUM_90' ? '90 ngày' : '30 ngày'}
+              </p>
             </div>
           )}
           <div className="flex items-center gap-3 px-2">

@@ -755,11 +755,18 @@ async def resolve_quota_state(db: Any, user_id: str, now: datetime) -> dict[str,
     is_active = bool(han_su_dung) and han_su_dung.replace(tzinfo=None) >= now.replace(tzinfo=None)
 
     if is_premium:
-        # Premium: luôn không giới hạn, không cần kiểm tra LUOTDUNG
-        plan_id = DEFAULT_PREMIUM_PLAN_ID
+        # Premium: luôn không giới hạn.
+        # Đọc đúng plan_id thực tế từ LUOTDUNG (DV_PREMIUM_30 hoặc DV_PREMIUM_90).
+        # Nếu usage_doc không có hoặc không phải premium plan thì fallback về DEFAULT.
+        PREMIUM_PLAN_IDS = {"DV_PREMIUM_30", "DV_PREMIUM_90"}
+        actual_plan_id = (
+            usage_doc.get("MaGoiDV")
+            if usage_doc and usage_doc.get("MaGoiDV") in PREMIUM_PLAN_IDS
+            else DEFAULT_PREMIUM_PLAN_ID
+        )
         return {
             "account_type": account_type,
-            "plan_id": plan_id,
+            "plan_id": actual_plan_id,
             "limit": -1,
             "is_unlimited": True,
             "period_start": now.replace(tzinfo=None),

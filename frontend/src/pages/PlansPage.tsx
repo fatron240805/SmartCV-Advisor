@@ -1,197 +1,472 @@
-import { useState, useEffect } from 'react';
-import { apiService } from '../services/api';
+import { useState, useEffect, useRef } from 'react';
+import { apiService, getApiErrorMessage } from '../services/api';
 
-export default function PlansPage() {
-  const [billingCycle, setBillingCycle] = useState<'30' | '90'>('30');
-  const [currentPlanId, setCurrentPlanId] = useState<string>('DV_FREE');
-  const [isLoading, setIsLoading] = useState(true);
+// ─────────────────────── Types ───────────────────────
+type PlanAction = 'upgrade-30' | 'upgrade-90' | 'renew' | 'cancel' | null;
+type PayStep = 'method' | 'details' | 'processing' | 'done';
+type PayMethod = 'bank' | 'momo' | 'vnpay';
 
-  useEffect(() => {
-    const fetchQuota = async () => {
-      try {
-        const result = await apiService.getQuota();
-        setCurrentPlanId(result.data.current_plan_id || 'DV_FREE');
-      } catch {
-        setCurrentPlanId('DV_FREE');
-      } finally {
-        setIsLoading(false);
+interface QuotaData {
+  unlimited: boolean;
+  current_plan_id: string;
+  account_type: string;
+  remaining: number | null;
+  used: number;
+  limit: number | null;
+  label: string;
+}
+
+// ─────────────────────── Constants ───────────────────────
+const PLAN_INFO: Record<string, { label: string; price: number; days: number }> = {
+  'upgrade-30': { label: 'Premium 30 ngày', price: 199000, days: 30 },
+  'upgrade-90': { label: 'Premium 90 ngày', price: 389000, days: 90 },
+  'renew-30':   { label: 'Gia hạn Premium 30 ngày', price: 199000, days: 30 },
+  'renew-90':   { label: 'Gia hạn Premium 90 ngày', price: 389000, days: 90 },
+};
+
+const METHODS: { id: PayMethod; name: string; logo: string; desc: string }[] = [
+  { id: 'bank',  name: 'Chuyển khoản ngân hàng', logo: '🏦', desc: 'Vietcombank / MB Bank / Techcombank' },
+  { id: 'momo',  name: 'Ví MoMo',               logo: '💜', desc: 'Quét mã QR hoặc nhập SĐT' },
+  { id: 'vnpay', name: 'VNPay',                  logo: '💳', desc: 'ATM nội địa / Thẻ quốc tế' },
+];
+
+const FAKE_BANK = {
+  bank: 'Vietcombank',
+  account: '1234 5678 9012 3456',
+  owner: 'CONG TY TNHH SMARTCV',
+  branch: 'Chi nhánh TP.HCM',
+};
+
+// ─────────────────────── Icons ───────────────────────
+const CheckIcon = ({ cls = 'text-green-500' }: { cls?: string }) => (
+  <svg className={`mt-0.5 h-5 w-5 shrink-0 ${cls}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+  </svg>
+);
+const ClockIcon = ({ cls = 'text-slate-400' }: { cls?: string }) => (
+  <svg className={`h-5 w-5 shrink-0 ${cls}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+);
+
+// ─────────────────────── Payment Modal ───────────────────────
+function PaymentModal({
+  action,
+  currentPlanId,
+  onSuccess,
+  onClose,
+}: {
+  action: PlanAction;
+  currentPlanId: string;
+  onSuccess: (msg: string) => void;
+  onClose: () => void;
+}) {
+  const [step, setStep] = useState<PayStep>('method');
+  const [method, setMethod] = useState<PayMethod>('bank');
+  const [error, setError] = useState('');
+  const [progress, setProgress] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  if (!action || action === 'cancel') return null;
+
+  const renewCycle = currentPlanId === 'DV_PREMIUM_90' ? '90' : '30';
+  const planKey = action === 'renew' ? `renew-${renewCycle}` : action;
+  const info = PLAN_INFO[planKey] ?? PLAN_INFO['upgrade-30'];
+  const priceStr = info.price.toLocaleString('vi-VN') + 'đ';
+
+  const startProcessing = () => {
+    setStep('processing');
+    setProgress(0);
+    let p = 0;
+    timerRef.current = setInterval(() => {
+      p += Math.random() * 18 + 6;
+      if (p >= 100) {
+        p = 100;
+        clearInterval(timerRef.current!);
+        // Gọi backend sau khi "processing" xong
+        (async () => {
+          try {
+            if (action === 'upgrade-30') {
+              await apiService.changePlan('DV_PREMIUM_30');
+              onSuccess('🎉 Nâng cấp Premium 30 ngày thành công!');
+            } else if (action === 'upgrade-90') {
+              await apiService.changePlan('DV_PREMIUM_90');
+              onSuccess('🚀 Nâng cấp Premium 90 ngày thành công!');
+            } else if (action === 'renew') {
+              const res = await apiService.renewPlan();
+              onSuccess('✅ Gia hạn thành công! Hạn mới: ' + new Date(res.data.new_expiry).toLocaleDateString('vi-VN'));
+            }
+            setStep('done');
+          } catch (err) {
+            setError(getApiErrorMessage(err));
+            setStep('details');
+          }
+        })();
       }
-    };
-    fetchQuota();
-  }, []);
+      setProgress(Math.min(p, 100));
+    }, 120);
+  };
 
-  const renderPremiumCard = (cycle: '30' | '90', isCurrent: boolean) => {
-    return (
-      <div className={`relative flex flex-col rounded-3xl p-8 ${isCurrent ? 'bg-white border border-slate-200 shadow-sm' : 'bg-blue-600 shadow-xl shadow-blue-600/20'}`}>
-        {cycle === '90' && !isCurrent && (
-          <div className="absolute right-6 top-6 rounded-full bg-white/20 px-3 py-1 text-xs font-semibold text-white">
-            Đề xuất
-          </div>
-        )}
-        {isCurrent && (
-          <div className="absolute right-6 top-6 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-600">
-            Gói hiện tại
-          </div>
-        )}
-        <h3 className={`pr-20 text-xl font-bold ${isCurrent ? 'text-slate-900' : 'text-white'}`}>Premium — Job Search Pass</h3>
-        <div className="mt-4 flex items-baseline">
-          <span className={`text-5xl font-extrabold tracking-tight ${isCurrent ? 'text-slate-900' : 'text-white'}`}>
-            đ{cycle === '30' ? '199.000' : '389.000'}
-          </span>
+  const getPaymentDetails = () => {
+    const ref = 'SCV' + Date.now().toString().slice(-8);
+    if (method === 'bank') return (
+      <div className="space-y-3 rounded-2xl bg-slate-50 p-5 text-sm">
+        <div className="flex justify-between"><span className="text-slate-500">Ngân hàng</span><span className="font-bold text-slate-900">{FAKE_BANK.bank}</span></div>
+        <div className="flex justify-between"><span className="text-slate-500">Số tài khoản</span>
+          <span className="font-mono font-bold text-slate-900 tracking-wider">{FAKE_BANK.account}</span></div>
+        <div className="flex justify-between"><span className="text-slate-500">Chủ tài khoản</span><span className="font-bold text-slate-900">{FAKE_BANK.owner}</span></div>
+        <div className="flex justify-between"><span className="text-slate-500">Chi nhánh</span><span className="font-bold text-slate-900">{FAKE_BANK.branch}</span></div>
+        <div className="mt-2 border-t border-slate-200 pt-3 flex justify-between">
+          <span className="text-slate-500">Số tiền</span><span className="text-xl font-extrabold text-blue-600">{priceStr}</span></div>
+        <div className="flex justify-between"><span className="text-slate-500">Nội dung CK</span>
+          <span className="font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg">{ref} {info.label.toUpperCase()}</span></div>
+      </div>
+    );
+    if (method === 'momo') return (
+      <div className="space-y-3 text-sm">
+        <div className="mx-auto h-44 w-44 rounded-2xl bg-gradient-to-br from-pink-100 to-pink-200 flex flex-col items-center justify-center gap-2">
+          <span className="text-5xl">💜</span>
+          <span className="text-sm font-bold text-pink-700">QR MoMo (mô phỏng)</span>
         </div>
-        <p className={`mt-2 text-sm font-medium ${isCurrent ? 'text-slate-400' : 'text-blue-200'}`}>
-          {cycle === '30' ? '30 ngày' : '90 ngày'}
-        </p>
-
-        <ul className={`mt-8 flex-1 space-y-4 text-sm font-medium ${isCurrent ? 'text-slate-700' : 'text-white'}`}>
-          {[
-            'Không giới hạn lượt phân tích',
-            'Gợi ý chi tiết chuyên sâu',
-            'Câu mẫu viết lại theo STAR',
-            'Sao chép nhanh từng câu mẫu',
-            'Tất cả quyền lợi Free',
-          ].map((feature, idx) => (
-            <li key={idx} className="flex items-start gap-3">
-              <svg className={`mt-0.5 h-5 w-5 shrink-0 ${isCurrent ? 'text-green-500' : 'text-white'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-              </svg>
-              <span>{feature}</span>
-            </li>
-          ))}
-
-          <li className={`my-6 border-t ${isCurrent ? 'border-slate-200' : 'border-blue-500/50'}`}></li>
-
-          {[
-            cycle === '30' ? 'Matching Score với JD (10 lượt)' : 'Matching Score với JD (20 lượt)',
-            cycle === '30' ? 'AI Assistant (20 lượt)' : 'AI Assistant (40 lượt)',
-            'Tải xuống CV đã chỉnh sửa',
-          ].map((feature, idx) => (
-            <li key={idx} className={`flex items-center gap-3 ${isCurrent ? 'text-slate-500' : 'text-blue-200'}`}>
-              <svg className={`h-5 w-5 shrink-0 ${isCurrent ? 'text-slate-400' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span className="flex-1">{feature}</span>
-              <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-semibold ${isCurrent ? 'border-slate-200 bg-slate-100 text-slate-500' : 'border-blue-400/30 bg-blue-500/30 text-blue-100'}`}>
-                Sắp ra mắt
-              </span>
-            </li>
-          ))}
-        </ul>
-
-        <button
-          disabled={isCurrent}
-          className={`mt-8 w-full rounded-2xl py-3.5 font-bold transition-all ${
-            isCurrent
-              ? 'bg-slate-50 text-slate-400 cursor-not-allowed opacity-80'
-              : 'bg-white text-blue-600 hover:bg-slate-50 hover:shadow-lg active:scale-95'
-          }`}
-        >
-          {isCurrent ? 'Đang sử dụng' : 'Nâng cấp Premium'}
-        </button>
+        <div className="rounded-2xl bg-slate-50 p-4 space-y-2">
+          <div className="flex justify-between"><span className="text-slate-500">SĐT MoMo</span><span className="font-bold text-slate-900">0901 234 567</span></div>
+          <div className="flex justify-between"><span className="text-slate-500">Số tiền</span><span className="font-extrabold text-pink-600">{priceStr}</span></div>
+          <div className="flex justify-between"><span className="text-slate-500">Mô tả</span><span className="font-mono text-sm text-pink-800">{ref}</span></div>
+        </div>
+      </div>
+    );
+    // vnpay
+    return (
+      <div className="space-y-3 text-sm">
+        <div className="mx-auto h-44 w-44 rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-200 flex flex-col items-center justify-center gap-2">
+          <span className="text-5xl">💳</span>
+          <span className="text-sm font-bold text-blue-700">QR VNPay (mô phỏng)</span>
+        </div>
+        <div className="rounded-2xl bg-slate-50 p-4 space-y-2">
+          <div className="flex justify-between"><span className="text-slate-500">Cổng thanh toán</span><span className="font-bold text-slate-900">VNPay</span></div>
+          <div className="flex justify-between"><span className="text-slate-500">Số tiền</span><span className="font-extrabold text-indigo-600">{priceStr}</span></div>
+          <div className="flex justify-between"><span className="text-slate-500">Mã giao dịch</span><span className="font-mono text-sm text-indigo-800">{ref}</span></div>
+        </div>
       </div>
     );
   };
 
-  const renderFreeCard = () => (
-    <div className="relative flex flex-col rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-      <div className="absolute right-6 top-6 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-600">
-        Gói hiện tại
-      </div>
-      <h3 className="text-xl font-bold text-slate-900">Free</h3>
-      <div className="mt-4 flex items-baseline">
-        <span className="text-5xl font-extrabold tracking-tight text-slate-900">đ0</span>
-      </div>
-      <p className="mt-2 text-sm font-medium text-slate-400">Mãi mãi miễn phí</p>
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 px-0 sm:px-4 backdrop-blur-sm">
+      <div className="w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl bg-white shadow-2xl overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+              {step === 'method' ? 'Chọn phương thức' : step === 'details' ? 'Thông tin thanh toán' : step === 'processing' ? 'Đang xử lý' : 'Hoàn tất'}
+            </p>
+            <h2 className="mt-0.5 text-lg font-bold text-slate-900">{info.label}</h2>
+          </div>
+          {step !== 'processing' && (
+            <button onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700">✕</button>
+          )}
+        </div>
 
+        <div className="px-6 py-5">
+          {/* Step: method */}
+          {step === 'method' && (
+            <div className="space-y-4">
+              {/* Order summary */}
+              <div className="rounded-2xl bg-blue-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-blue-500 mb-2">Đơn hàng</p>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-slate-700">{info.label}</span>
+                  <span className="text-xl font-extrabold text-blue-600">{priceStr}</span>
+                </div>
+                <p className="mt-1 text-xs text-slate-500">Hiệu lực {info.days} ngày kể từ ngày kích hoạt</p>
+              </div>
+
+              <p className="text-sm font-semibold text-slate-700">Chọn phương thức thanh toán</p>
+              <div className="space-y-2">
+                {METHODS.map(m => (
+                  <button key={m.id} onClick={() => setMethod(m.id)}
+                    className={`flex w-full items-center gap-4 rounded-2xl border-2 p-4 text-left transition-all ${method === m.id ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-blue-200 hover:bg-blue-50/30'}`}>
+                    <span className="text-2xl">{m.logo}</span>
+                    <div>
+                      <p className="font-semibold text-slate-900">{m.name}</p>
+                      <p className="text-xs text-slate-500">{m.desc}</p>
+                    </div>
+                    {method === m.id && <span className="ml-auto text-blue-500 text-lg">✓</span>}
+                  </button>
+                ))}
+              </div>
+              <button onClick={() => setStep('details')}
+                className="mt-2 w-full rounded-2xl bg-blue-600 py-3.5 font-bold text-white transition hover:bg-blue-700 active:scale-95">
+                Tiếp theo →
+              </button>
+            </div>
+          )}
+
+          {/* Step: details */}
+          {step === 'details' && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-sm text-slate-500">
+                <button onClick={() => setStep('method')} className="text-blue-600 hover:underline">← Quay lại</button>
+                <span>·</span>
+                <span>{METHODS.find(m => m.id === method)?.name}</span>
+              </div>
+              {getPaymentDetails()}
+              {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{error}</div>}
+              <button onClick={startProcessing}
+                className="w-full rounded-2xl bg-emerald-600 py-3.5 font-bold text-white transition hover:bg-emerald-700 active:scale-95">
+                ✅ Xác nhận đã thanh toán
+              </button>
+              <p className="text-center text-xs text-slate-400">Hệ thống sẽ xác minh và kích hoạt gói trong vài giây.</p>
+            </div>
+          )}
+
+          {/* Step: processing */}
+          {step === 'processing' && (
+            <div className="flex flex-col items-center gap-5 py-6">
+              <div className="relative h-24 w-24">
+                <svg className="h-24 w-24 -rotate-90" viewBox="0 0 96 96">
+                  <circle cx="48" cy="48" r="40" fill="none" stroke="#e2e8f0" strokeWidth="8" />
+                  <circle cx="48" cy="48" r="40" fill="none" stroke="#2563eb" strokeWidth="8"
+                    strokeDasharray={`${2 * Math.PI * 40}`}
+                    strokeDashoffset={`${2 * Math.PI * 40 * (1 - progress / 100)}`}
+                    strokeLinecap="round" style={{ transition: 'stroke-dashoffset 0.15s' }} />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center text-lg font-bold text-blue-600">
+                  {Math.round(progress)}%
+                </div>
+              </div>
+              <p className="text-center font-semibold text-slate-800">Đang xác minh thanh toán...</p>
+              <p className="text-center text-sm text-slate-500">Vui lòng không đóng cửa sổ này.</p>
+              <div className="w-full space-y-2 text-sm text-slate-500">
+                {[
+                  { label: 'Xác nhận giao dịch', done: progress >= 30 },
+                  { label: 'Kích hoạt gói dịch vụ', done: progress >= 65 },
+                  { label: 'Cập nhật tài khoản', done: progress >= 90 },
+                ].map(s => (
+                  <div key={s.label} className={`flex items-center gap-2 ${s.done ? 'text-emerald-600 font-medium' : ''}`}>
+                    <span>{s.done ? '✓' : '○'}</span>{s.label}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Step: done */}
+          {step === 'done' && (
+            <div className="flex flex-col items-center gap-4 py-6 text-center">
+              <div className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100 text-4xl">🎉</div>
+              <h3 className="text-xl font-bold text-slate-900">Thanh toán thành công!</h3>
+              <p className="text-sm text-slate-500">Gói <strong>{info.label}</strong> đã được kích hoạt cho tài khoản của bạn.</p>
+              <button onClick={onClose}
+                className="mt-2 w-full rounded-2xl bg-blue-600 py-3.5 font-bold text-white transition hover:bg-blue-700">
+                Về trang gói dịch vụ
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────── Cancel Modal ───────────────────────
+function CancelModal({ onConfirm, onCancel, loading, error }: {
+  onConfirm: () => void; onCancel: () => void; loading: boolean; error: string;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-2xl">
+        <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-red-100 text-3xl">⚠️</div>
+        <h2 className="text-xl font-bold text-slate-900">Hủy gói Premium</h2>
+        <p className="mt-3 text-sm leading-relaxed text-slate-600">
+          Tài khoản sẽ về gói <strong>Free</strong> ngay lập tức. Bạn sẽ bị giới hạn còn 3 lượt phân tích tổng cộng.
+          Hành động này không thể hoàn tác.
+        </p>
+        {error && <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{error}</div>}
+        <div className="mt-6 flex gap-3">
+          <button onClick={onCancel} disabled={loading}
+            className="flex-1 rounded-2xl border border-slate-200 py-3 font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50">
+            Giữ gói Premium
+          </button>
+          <button onClick={onConfirm} disabled={loading}
+            className="flex-1 rounded-2xl bg-red-600 py-3 font-bold text-white transition hover:bg-red-700 disabled:opacity-50">
+            {loading ? 'Đang hủy...' : 'Xác nhận hủy'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────── Plan Cards ───────────────────────
+const PREMIUM_FEATURES = ['Không giới hạn lượt phân tích', 'Gợi ý chi tiết chuyên sâu', 'Câu mẫu viết lại theo STAR', 'Sao chép nhanh từng câu mẫu', 'Tất cả quyền lợi Free'];
+const getCS = (c: '30' | '90') => [c === '30' ? 'Matching Score với JD (10 lượt)' : 'Matching Score với JD (20 lượt)', c === '30' ? 'AI Assistant (20 lượt)' : 'AI Assistant (40 lượt)', 'Tải xuống CV đã chỉnh sửa'];
+
+function FreeCard() {
+  return (
+    <div className="relative flex flex-col rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+      <div className="absolute right-6 top-6 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-600">Gói hiện tại</div>
+      <h3 className="text-xl font-bold text-slate-900">Free</h3>
+      <div className="mt-4"><span className="text-5xl font-extrabold tracking-tight text-slate-900">đ0</span></div>
+      <p className="mt-2 text-sm font-medium text-slate-400">Mãi mãi miễn phí</p>
       <ul className="mb-8 mt-8 flex-1 space-y-4 text-sm font-medium text-slate-700">
-        {[
-          '3 lượt phân tích/tháng',
-          'Điểm tổng quan và 5 tiêu chí',
-          'Danh sách lỗi phổ biến',
-          'Gợi ý cải thiện tổng quan',
-          'Lịch sử phân tích',
-        ].map((feature, idx) => (
-          <li key={idx} className="flex items-start gap-3">
-            <svg className="mt-0.5 h-5 w-5 shrink-0 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-            </svg>
-            <span>{feature}</span>
+        {['3 lượt phân tích', 'Điểm tổng quan và 5 tiêu chí', 'Danh sách lỗi phổ biến', 'Gợi ý cải thiện tổng quan', 'Lịch sử phân tích'].map((f, i) => (
+          <li key={i} className="flex items-start gap-3"><CheckIcon /><span>{f}</span></li>
+        ))}
+      </ul>
+      <button disabled className="w-full rounded-2xl bg-slate-50 py-3.5 font-bold text-slate-400 cursor-not-allowed opacity-80">Gói hiện tại của bạn</button>
+    </div>
+  );
+}
+
+function CurrentPremiumCard({ cycle, onRenew, onCancel }: { cycle: '30' | '90'; onRenew: () => void; onCancel: () => void }) {
+  return (
+    <div className="relative flex flex-col rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+      <div className="absolute right-6 top-6 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-600">Gói hiện tại</div>
+      <h3 className="pr-20 text-xl font-bold text-slate-900">Premium — Job Search Pass</h3>
+      <div className="mt-4"><span className="text-5xl font-extrabold tracking-tight text-slate-900">đ{cycle === '30' ? '199.000' : '389.000'}</span></div>
+      <p className="mt-2 text-sm font-medium text-slate-400">{cycle === '30' ? '30 ngày' : '90 ngày'}</p>
+      <ul className="mt-8 flex-1 space-y-4 text-sm font-medium text-slate-700">
+        {PREMIUM_FEATURES.map((f, i) => <li key={i} className="flex items-start gap-3"><CheckIcon /><span>{f}</span></li>)}
+        <li className="my-4 border-t border-slate-200" />
+        {getCS(cycle).map((f, i) => (
+          <li key={i} className="flex items-center gap-3 text-slate-500">
+            <ClockIcon /><span className="flex-1">{f}</span>
+            <span className="rounded-full border border-slate-200 bg-slate-100 px-2.5 py-0.5 text-[10px] font-semibold text-slate-500">Sắp ra mắt</span>
           </li>
         ))}
       </ul>
-
-      <button
-        disabled
-        className="w-full rounded-2xl bg-slate-50 py-3.5 font-bold text-slate-400 transition cursor-not-allowed opacity-80"
-      >
-        Gói hiện tại của bạn
-      </button>
+      <div className="mt-8 flex flex-col gap-3">
+        <button onClick={onRenew} className="w-full rounded-2xl bg-emerald-600 py-3.5 font-bold text-white transition hover:bg-emerald-700 active:scale-95">🔄 Gia hạn gói hiện tại</button>
+        <button onClick={onCancel} className="w-full rounded-2xl border border-red-200 py-3.5 font-semibold text-red-600 transition hover:bg-red-50 active:scale-95">Hủy gói Premium</button>
+      </div>
     </div>
   );
+}
 
-  if (isLoading) {
-    return <div className="flex justify-center py-20 text-slate-400">Đang tải gói dịch vụ...</div>;
-  }
+function UpgradePremiumCard({ cycle, recommended, onUpgrade }: { cycle: '30' | '90'; recommended?: boolean; onUpgrade: () => void }) {
+  return (
+    <div className={`relative flex flex-col rounded-3xl p-8 shadow-xl ${recommended ? 'bg-blue-600 shadow-blue-600/20' : 'bg-blue-500 shadow-blue-500/20'}`}>
+      {recommended && <div className="absolute right-6 top-6 rounded-full bg-white/20 px-3 py-1 text-xs font-semibold text-white">Đề xuất</div>}
+      <h3 className="pr-20 text-xl font-bold text-white">Premium — Job Search Pass</h3>
+      <div className="mt-4"><span className="text-5xl font-extrabold tracking-tight text-white">đ{cycle === '30' ? '199.000' : '389.000'}</span></div>
+      <p className="mt-2 text-sm font-medium text-blue-200">{cycle === '30' ? '30 ngày' : '90 ngày'}</p>
+      <ul className="mt-8 flex-1 space-y-4 text-sm font-medium text-white">
+        {PREMIUM_FEATURES.map((f, i) => <li key={i} className="flex items-start gap-3"><CheckIcon cls="text-white" /><span>{f}</span></li>)}
+        <li className="my-4 border-t border-blue-500/50" />
+        {getCS(cycle).map((f, i) => (
+          <li key={i} className="flex items-center gap-3 text-blue-200">
+            <ClockIcon cls="" /><span className="flex-1">{f}</span>
+            <span className="rounded-full border border-blue-400/30 bg-blue-500/30 px-2.5 py-0.5 text-[10px] font-semibold text-blue-100">Sắp ra mắt</span>
+          </li>
+        ))}
+      </ul>
+      <button onClick={onUpgrade} className="mt-8 w-full rounded-2xl bg-white py-3.5 font-bold text-blue-600 transition hover:bg-slate-50 hover:shadow-lg active:scale-95">Nâng cấp Premium</button>
+    </div>
+  );
+}
+
+// ─────────────────────── Main Page ───────────────────────
+export default function PlansPage() {
+  const [billingCycle, setBillingCycle] = useState<'30' | '90'>('30');
+  const [quota, setQuota] = useState<QuotaData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [payAction, setPayAction] = useState<PlanAction>(null);
+  const [showCancel, setShowCancel] = useState(false);
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [cancelError, setCancelError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
+
+  const currentPlanId = quota?.current_plan_id ?? 'DV_FREE';
+
+  const refreshQuota = async () => {
+    const result = await apiService.getQuota();
+    setQuota(result.data as QuotaData);
+  };
+
+  useEffect(() => { refreshQuota().finally(() => setIsLoading(false)); }, []);
+
+  const handlePaySuccess = async (msg: string) => {
+    setSuccessMsg(msg);
+    await refreshQuota();
+  };
+
+  const handleCancel = async () => {
+    setCancelLoading(true);
+    setCancelError('');
+    try {
+      await apiService.cancelPlan();
+      setShowCancel(false);
+      setSuccessMsg('Đã hủy gói Premium. Tài khoản về gói Free.');
+      await refreshQuota();
+    } catch (err) {
+      setCancelError(getApiErrorMessage(err));
+    } finally {
+      setCancelLoading(false);
+    }
+  };
+
+  if (isLoading) return <div className="flex justify-center py-20 text-slate-400">Đang tải gói dịch vụ...</div>;
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-12">
+      {successMsg && (
+        <div className="mb-8 flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4">
+          <span className="text-sm font-semibold text-emerald-700">{successMsg}</span>
+          <button onClick={() => setSuccessMsg('')} className="ml-auto text-emerald-500 hover:text-emerald-700">✕</button>
+        </div>
+      )}
+
       <div className="mb-12 text-center">
-        <h1 className="mb-8 text-2xl font-medium text-slate-500">
-          {currentPlanId === 'DV_FREE'
-            ? 'Bắt đầu miễn phí, nâng cấp khi bạn cần thêm sức mạnh'
+        <h1 className="mb-4 text-2xl font-medium text-slate-500">
+          {currentPlanId === 'DV_FREE' ? 'Bắt đầu miễn phí, nâng cấp khi bạn cần thêm sức mạnh'
+            : currentPlanId === 'DV_PREMIUM_30' ? 'Nâng cấp lên gói 90 ngày để tiết kiệm hơn'
             : 'Sử dụng công cụ AI mạnh mẽ nhất để nâng tầm CV của bạn'}
         </h1>
-        
-        {/* Toggle Billing Cycle for Free users */}
-        {currentPlanId === 'DV_FREE' && (
-          <div className="mx-auto inline-flex items-center gap-1 rounded-full bg-slate-100 p-1">
-            <button
-              onClick={() => setBillingCycle('30')}
-              className={`rounded-full px-6 py-2.5 text-sm font-semibold transition-all ${billingCycle === '30'
-                ? 'bg-white text-slate-900 shadow-sm'
-                : 'text-slate-500 hover:text-slate-700'
-                }`}
-            >
-              30 ngày
-            </button>
-            <button
-              onClick={() => setBillingCycle('90')}
-              className={`relative flex items-center gap-1.5 rounded-full px-6 py-2.5 text-sm font-semibold transition-all ${billingCycle === '90'
-                ? 'bg-white text-slate-900 shadow-sm'
-                : 'text-slate-500 hover:text-slate-700'
-                }`}
-            >
-              90 ngày
-              <span className="font-bold text-emerald-500">-35%</span>
-              <span className="absolute -top-2.5 -right-2 rounded-md bg-blue-600 px-1.5 py-0.5 text-[10px] font-bold text-white shadow-sm ring-1 ring-white">
-                Đề xuất
-              </span>
-            </button>
-          </div>
-        )}
       </div>
 
-      <div className={`mx-auto grid max-w-4xl gap-6 ${currentPlanId === 'DV_PREMIUM_90' ? 'md:grid-cols-1 max-w-md' : 'md:grid-cols-2'}`}>
-        {currentPlanId === 'DV_FREE' && (
-          <>
-            {renderFreeCard()}
-            {renderPremiumCard(billingCycle, false)}
-          </>
-        )}
+      {/* Free: 3 cards — Free (current) + Premium 30 + Premium 90 */}
+      {currentPlanId === 'DV_FREE' && (
+        <div className="mx-auto grid max-w-5xl gap-6 md:grid-cols-3">
+          <FreeCard />
+          <UpgradePremiumCard cycle="30" recommended={false} onUpgrade={() => setPayAction('upgrade-30')} />
+          <UpgradePremiumCard cycle="90" recommended onUpgrade={() => setPayAction('upgrade-90')} />
+        </div>
+      )}
 
-        {currentPlanId === 'DV_PREMIUM_30' && (
-          <>
-            {renderPremiumCard('30', true)}
-            {renderPremiumCard('90', false)}
-          </>
-        )}
+      {/* Premium 30: card hiện tại (gia hạn/hủy) + card 90 để nâng cấp */}
+      {currentPlanId === 'DV_PREMIUM_30' && (
+        <div className="mx-auto grid max-w-4xl gap-6 md:grid-cols-2">
+          <CurrentPremiumCard cycle="30" onRenew={() => setPayAction('renew')} onCancel={() => { setCancelError(''); setShowCancel(true); }} />
+          <UpgradePremiumCard cycle="90" recommended onUpgrade={() => setPayAction('upgrade-90')} />
+        </div>
+      )}
 
-        {currentPlanId === 'DV_PREMIUM_90' && (
-          <>
-            {renderPremiumCard('90', true)}
-          </>
-        )}
-      </div>
+      {/* Premium 90: chỉ 1 card với gia hạn/hủy */}
+      {currentPlanId === 'DV_PREMIUM_90' && (
+        <div className="mx-auto max-w-md">
+          <CurrentPremiumCard cycle="90" onRenew={() => setPayAction('renew')} onCancel={() => { setCancelError(''); setShowCancel(true); }} />
+        </div>
+      )}
+
+      <p className="mt-10 text-center text-xs text-slate-400">🔒 Thanh toán bảo mật. Gói được kích hoạt ngay sau khi xác nhận.</p>
+
+      {payAction && payAction !== 'cancel' && (
+        <PaymentModal
+          action={payAction}
+          currentPlanId={currentPlanId}
+          onSuccess={handlePaySuccess}
+          onClose={() => setPayAction(null)}
+        />
+      )}
+      {showCancel && (
+        <CancelModal
+          onConfirm={handleCancel}
+          onCancel={() => setShowCancel(false)}
+          loading={cancelLoading}
+          error={cancelError}
+        />
+      )}
     </div>
   );
 }

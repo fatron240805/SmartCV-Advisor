@@ -469,7 +469,7 @@ export default function UploadCvPage() {
 
             {quotaExceeded && (
               <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-700">
-                Bạn đã dùng hết lượt phân tích trong tháng này. Nâng cấp Premium để tiếp tục.
+                Bạn đã dùng hết lượt phân tích. Nâng cấp Premium để tiếp tục.
               </div>
             )}
 

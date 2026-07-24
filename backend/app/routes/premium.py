@@ -20,7 +20,7 @@ PLANS = [
         "duration_days": None,
         "analysis_limit": 3,
         "features": [
-            "3 lượt phân tích/tháng",
+            "3 lượt phân tích",
             "Điểm tổng quan và 5 tiêu chí",
             "Danh sách lỗi phổ biến",
             "Gợi ý cải thiện tổng quan",
@@ -109,7 +109,7 @@ async def get_service_plans() -> dict[str, Any]:
                 "duration_days": None,
                 "analysis_limit": 3,
                 "features": [
-                    "3 lượt phân tích/tháng",
+                    "3 lượt phân tích",
                     "Điểm tổng quan và 5 tiêu chí",
                     "Danh sách lỗi phổ biến",
                     "Gợi ý cải thiện tổng quan",

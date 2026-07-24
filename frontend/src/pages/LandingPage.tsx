@@ -193,7 +193,7 @@ export default function LandingPage() {
                 <svg viewBox="0 0 20 20" className="h-4 w-4 text-green-500" fill="currentColor" aria-hidden="true">
                   <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
                 </svg>
-                Miễn phí 3 lượt/tháng
+                Miễn phí 3 lượt
               </span>
               <span className="flex items-center gap-1.5">
                 <svg viewBox="0 0 20 20" className="h-4 w-4 text-green-500" fill="currentColor" aria-hidden="true">
@@ -398,11 +398,10 @@ export default function LandingPage() {
               <p className="text-sm font-semibold uppercase tracking-widest text-slate-400">Free</p>
               <div className="mt-2 flex items-baseline gap-1">
                 <span className="text-5xl font-extrabold text-slate-900">₫0</span>
-                <span className="text-slate-400">/tháng</span>
               </div>
               <ul className="mt-7 space-y-3 text-sm text-slate-600">
                 {[
-                  '3 lượt phân tích/tháng',
+                  '3 lượt phân tích',
                   'Điểm tổng quan & điểm thành phần',
                   'Danh sách lỗi phổ biến',
                   'Gợi ý cải thiện tổng quan',

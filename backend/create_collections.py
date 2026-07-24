@@ -158,7 +158,7 @@ async def main():
                         "SoLuotPhanTich": 3,
                         "HanSuDung": 30,
                         "QuyenLoi": (
-                            "3 lượt phân tích mỗi tháng; xem điểm tổng quan; "
+                            "3 lượt phân tích; xem điểm tổng quan; "
                             "xem lỗi phổ biến và gợi ý cải thiện tổng quan."
                         ),
                         "NgayTao": now,

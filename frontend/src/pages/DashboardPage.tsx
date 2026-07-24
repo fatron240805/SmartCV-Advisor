@@ -50,20 +50,20 @@ export default function DashboardPage() {
   if (loading) return <div className="text-center mt-20 text-slate-500">Đang tải dữ liệu...</div>;
 
   const todayStr = new Date().toLocaleDateString('vi-VN');
-  
+
   // Stats calculations
   const totalAnalyzed = quota?.used || 0;
   const maxScoreItem = history.length > 0 ? history.reduce((max, item) => item.overall_score > max.overall_score ? item : max, history[0]) : null;
   const lastAnalyzedDate = history.length > 0 ? new Date(history[0].created_at).toLocaleDateString('vi-VN') : 'Chưa có';
   const quotaExceeded = quota !== null && !quota.unlimited && (quota.remaining ?? 1) <= 0;
-  
+
   return (
     <div className="mx-auto max-w-5xl px-5 py-8 pb-20">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-slate-900 mb-2">Xin chào, {firstName} 👋</h1>
         <p className="text-slate-500">
-          Hôm nay là {todayStr} — Bạn còn <span className="font-bold text-blue-600">{quota?.unlimited ? 'không giới hạn' : `${quota?.remaining}/${quota?.limit} lượt`}</span> phân tích trong tháng.
+          Hôm nay là {todayStr} — Bạn còn <span className="font-bold text-blue-600">{quota?.unlimited ? 'không giới hạn' : `${quota?.remaining}/${quota?.limit} lượt`}</span>
         </p>
       </div>
 
@@ -73,15 +73,14 @@ export default function DashboardPage() {
           <h2 className="text-2xl font-bold mb-2">Phân tích CV mới</h2>
           <p className="text-blue-100">Tải CV lên để nhận điểm số và các gợi ý cải thiện ngay.</p>
         </div>
-        <button 
+        <button
           onClick={() => !quotaExceeded && navigate('/upload')}
           disabled={quotaExceeded}
           title={quotaExceeded ? 'Bạn đã hết lượt phân tích. Nâng cấp Premium để tiếp tục.' : undefined}
-          className={`mt-6 sm:mt-0 flex items-center gap-2 rounded-2xl px-6 py-3.5 font-bold transition active:scale-95 ${
-            quotaExceeded
-              ? 'bg-white/50 text-blue-300 cursor-not-allowed'
-              : 'bg-white text-blue-600 hover:bg-slate-50'
-          }`}
+          className={`mt-6 sm:mt-0 flex items-center gap-2 rounded-2xl px-6 py-3.5 font-bold transition active:scale-95 ${quotaExceeded
+            ? 'bg-white/50 text-blue-300 cursor-not-allowed'
+            : 'bg-white text-blue-600 hover:bg-slate-50'
+            }`}
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
@@ -101,7 +100,6 @@ export default function DashboardPage() {
           </div>
           <h3 className="text-3xl font-extrabold text-slate-900">{totalAnalyzed}</h3>
           <p className="mt-1 font-semibold text-slate-700">Lượt phân tích</p>
-          <p className="text-sm text-slate-400">trong tháng này</p>
         </div>
 
         {/* Card 2 */}
@@ -152,7 +150,7 @@ export default function DashboardPage() {
           {/* We omit Xem tất cả if this page is essentially the history view */}
           <span className="text-blue-600 font-medium hover:underline cursor-pointer text-sm">Xem tất cả</span>
         </div>
-        
+
         {history.length === 0 ? (
           <div className="p-10 text-center text-slate-500">
             Bạn chưa có kết quả phân tích nào.
@@ -163,7 +161,7 @@ export default function DashboardPage() {
               const dateStr = new Date(item.created_at).toLocaleDateString('vi-VN');
               const isGood = item.overall_score >= 70;
               const isAverage = item.overall_score >= 50 && item.overall_score < 70;
-              
+
               const scoreColor = isGood ? 'text-blue-600' : isAverage ? 'text-orange-500' : 'text-red-500';
               const scoreText = isGood ? 'Khá' : isAverage ? 'Trung bình' : 'Cần cải thiện';
 
@@ -180,7 +178,7 @@ export default function DashboardPage() {
                       <p className="text-sm text-slate-500 mt-0.5">Frontend Developer · {dateStr}</p>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center gap-6">
                     <div className="text-right hidden sm:block">
                       <p className={`font-extrabold text-2xl ${scoreColor}`}>{item.overall_score}</p>
@@ -214,7 +212,7 @@ export default function DashboardPage() {
               <p className="text-sm text-slate-500 mt-1">Câu mẫu viết lại, phân tích chuyên sâu và nhiều hơn nữa.</p>
             </div>
           </div>
-          <button 
+          <button
             onClick={() => navigate('/plans')}
             className="w-full sm:w-auto whitespace-nowrap rounded-2xl bg-purple-600 px-6 py-3.5 font-bold text-white hover:bg-purple-700 transition"
           >

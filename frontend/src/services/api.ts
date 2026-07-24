@@ -339,6 +339,21 @@ export const apiService = {
     const response = await apiClient.post(`/admin/users/${userId}/unlock`);
     return response.data;
   },
+
+  changePlan: async (planId: string): Promise<{ data: { plan_id: string; account_type: string }; meta: { message: string } }> => {
+    const response = await apiClient.post('/users/me/change-plan', { plan_id: planId });
+    return response.data;
+  },
+
+  renewPlan: async (): Promise<{ data: { plan_id: string; new_expiry: string }; meta: { message: string } }> => {
+    const response = await apiClient.post('/users/me/renew-plan');
+    return response.data;
+  },
+
+  cancelPlan: async (): Promise<{ data: { account_type: string }; meta: { message: string } }> => {
+    const response = await apiClient.post('/users/me/cancel-plan');
+    return response.data;
+  },
 };
 
 export function getApiErrorMessage(error: unknown): string {
