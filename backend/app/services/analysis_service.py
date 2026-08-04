@@ -17,8 +17,10 @@ from app.services.gpt_service import SECTION_RUBRIC, evaluate_sections_with_gpt,
 from app.services.role_dataset import load_default_roles
 
 
-SCORING_CONFIG_VERSION = "notebook-section-roadmap-v4"
+SCORING_CONFIG_VERSION = "admin-weighted-skill-v5"
 TOTAL_SCORE_SCALE = 1.25
+WEIGHTED_TECHNICAL_BONUS_MAX = 4.0
+WEIGHTED_TOTAL_BONUS_MAX = 3.0
 
 IMPORTANCE_LABELS = {
     0: "Không cần có",
@@ -26,6 +28,32 @@ IMPORTANCE_LABELS = {
     2: "Quan trọng",
     3: "Rất quan trọng / bắt buộc",
 }
+
+
+def is_active_status(value: Any) -> bool:
+    return normalize_search_text(str(value or "active")) in {"active", "hoat dong"}
+
+
+def parse_importance_value(value: Any) -> int:
+    try:
+        return max(0, min(3, int(float(value))))
+    except (TypeError, ValueError):
+        pass
+
+    normalized = normalize_search_text(str(value))
+    if "bat buoc" in normalized or "rat quan trong" in normalized:
+        return 3
+    if "quan trong" in normalized:
+        return 2
+    if "nice" in normalized or "cong them" in normalized:
+        return 1
+    return 0
+
+
+def skill_scoring_weight(item: dict[str, Any]) -> float:
+    if "weight" in item and item.get("weight") is not None:
+        return clamp_float(item.get("weight"), 0.0, 100.0)
+    return float(max(0, int(item.get("importance", 0) or 0)))
 
 ROADMAP_SKILL_TOPIC_LIBRARY = [
     {
@@ -528,17 +556,24 @@ def build_technical_sub_scores(section_score: dict[str, Any], skill_assessment: 
             descriptions.append(f"{blueprint['description']} Role hiện không có skill nhóm này trong dataset tham chiếu.")
             continue
 
-        evidence_levels = [
-            int(clamp_float(item.get("evidence_level"), 0.0, 3.0))
-            for item in group_items
-        ]
+        evidence_levels = [int(clamp_float(item.get("evidence_level"), 0.0, 3.0)) for item in group_items]
         matched = sum(1 for level in evidence_levels if level > 0)
         strong = sum(1 for level in evidence_levels if level >= 3)
         max_score = float(blueprint["max_score"])
-        weights.append(max_score * sum(evidence_levels) / (len(group_items) * 3))
+        group_weight_total = sum(skill_scoring_weight(item) for item in group_items)
+        if group_weight_total > 0:
+            weighted_evidence = sum(
+                skill_scoring_weight(item) * int(clamp_float(item.get("evidence_level"), 0.0, 3.0))
+                for item in group_items
+            )
+            coverage = weighted_evidence / (group_weight_total * 3)
+        else:
+            coverage = sum(evidence_levels) / (len(group_items) * 3)
+        weights.append(max_score * coverage)
         descriptions.append(
             f"{blueprint['description']} Có {matched}/{len(group_items)} kỹ năng được nhận diện; "
-            f"{strong} kỹ năng có bằng chứng mạnh trong Projects/Experience."
+            f"{strong} kỹ năng có bằng chứng mạnh trong Projects/Experience; "
+            f"weighted coverage khoảng {int(round(coverage * 100))}%."
         )
 
     scores = distribute_points(float(section_score.get("score", 0) or 0), max_scores, weights)
@@ -911,12 +946,67 @@ def normalize_role_document(document: dict[str, Any], skills: list[dict[str, Any
         "role_id": role_id,
         "name": document.get("TenNganh") or document.get("name"),
         "description": document.get("MoTa") or document.get("description", ""),
-        "status": "active"
-        if str(document.get("TrangThai", document.get("status", "active"))).lower() in {"active", "hoat dong", "hoạt động"}
-        else "inactive",
+        "status": "active" if is_active_status(document.get("TrangThai", document.get("status", "active"))) else "inactive",
         "skills": skills or document.get("skills", []),
         "icon_label": ROLE_ICON_LABELS.get(str(role_id), "IT"),
+        "roadmap": document.get("Roadmap") or document.get("roadmap", ""),
+        "scoring_config_version": document.get("ScoringConfigVersion"),
     }
+
+
+async def load_admin_role_skills(db: Any, role_id: str) -> list[dict[str, Any]]:
+    try:
+        relations = await db["NGANHNGHE_KYNANG"].find({"MaNganh": role_id}).to_list(length=300)
+    except Exception:
+        return []
+
+    skills: list[dict[str, Any]] = []
+    for relation in relations:
+        if not is_active_status(relation.get("TrangThai", "active")):
+            continue
+
+        try:
+            skill = await db["KYNANG"].find_one({"_id": relation.get("MaKyNang")})
+            score = await db["DIEMDANHGIA"].find_one({"MaNganh": role_id, "MaKyNang": relation.get("MaKyNang")})
+            if not score:
+                score = await db["DIEMDANHGIA"].find_one({"MaKyNang": relation.get("MaKyNang"), "MaNganh": {"$exists": False}})
+        except Exception:
+            continue
+
+        if not skill:
+            continue
+        score = score or {}
+        if not is_active_status(score.get("TrangThai", relation.get("TrangThai", "active"))):
+            continue
+
+        score_is_role_specific = score.get("MaNganh") == role_id
+        importance_source = (
+            score.get("MucDoQuanTrong", score.get("MucDo", score.get("Diem", 0)))
+            if score_is_role_specific
+            else relation.get("Diem", score.get("MucDoQuanTrong", score.get("MucDo", score.get("Diem", 0))))
+        )
+        score_source = score.get("Diem", relation.get("Diem", 0)) if score_is_role_specific else relation.get("Diem", score.get("Diem", 0))
+        weight_source = (
+            score.get("TrongSo", relation.get("TrongSo", 0))
+            if score_is_role_specific
+            else relation.get("TrongSo", score.get("TrongSo", 0))
+        )
+        importance = parse_importance_value(
+            importance_source
+        )
+        skills.append(
+            {
+                "skill": skill.get("TenKyNang", ""),
+                "group": skill.get("NhomKyNang") or relation.get("NhomKyNang") or skill.get("Nhom") or "General",
+                "importance": importance,
+                "required_score": clamp_float(score_source, 0.0, 100.0),
+                "weight": clamp_float(weight_source, 0.0, 100.0),
+                "criteria_description": str(score.get("MoTaTieuChi", "") or "").strip(),
+                "config_id": score.get("_id"),
+            }
+        )
+
+    return sorted(skills, key=lambda item: (-skill_scoring_weight(item), -int(item.get("importance", 0)), item["skill"]))
 
 
 async def list_career_roles(db: Any) -> list[dict[str, Any]]:
@@ -940,6 +1030,7 @@ async def list_career_roles(db: Any) -> list[dict[str, Any]]:
         original_role_id = str(role["role_id"])
         canonical_role_id = LEGACY_ROLE_ID_ALIASES.get(original_role_id, original_role_id)
         fallback = roles_by_id.get(canonical_role_id)
+        admin_skills = await load_admin_role_skills(db, canonical_role_id)
 
         if original_role_id != canonical_role_id and canonical_role_id in canonical_document_ids:
             continue
@@ -951,12 +1042,14 @@ async def list_career_roles(db: Any) -> list[dict[str, Any]]:
             if original_role_id == canonical_role_id:
                 merged_role["name"] = role["name"] or fallback["name"]
                 merged_role["description"] = role["description"] or fallback["description"]
-                merged_role["skills"] = role["skills"] or fallback.get("skills", [])
+                merged_role["skills"] = admin_skills or role["skills"] or fallback.get("skills", [])
+                merged_role["scoring_config_version"] = role.get("scoring_config_version")
             merged_role["icon_label"] = ROLE_ICON_LABELS.get(canonical_role_id, fallback.get("icon_label", "IT"))
             merged_roles[canonical_role_id] = merged_role
             continue
 
         role["role_id"] = canonical_role_id
+        role["skills"] = admin_skills or role.get("skills", [])
         role["icon_label"] = ROLE_ICON_LABELS.get(canonical_role_id, role.get("icon_label", "IT"))
         merged_roles[canonical_role_id] = role
 
@@ -1070,6 +1163,9 @@ def detect_skill_evidence(sections: dict[str, str], role: dict[str, Any]) -> lis
                 "skill": skill,
                 "group": skill_config.get("group", "General"),
                 "importance": int(skill_config.get("importance", 0)),
+                "required_score": skill_config.get("required_score"),
+                "weight": skill_scoring_weight(skill_config),
+                "criteria_description": skill_config.get("criteria_description", ""),
                 "evidence_level": evidence_level,
                 "found_sections": found_sections,
                 "matched_keywords": matched_keywords,
@@ -1415,6 +1511,55 @@ def apply_gpt_section_scores(
     return normalized
 
 
+def weighted_skill_coverage(skill_assessment: list[dict[str, Any]]) -> float:
+    relevant_skills = [
+        item
+        for item in skill_assessment
+        if int(item.get("importance", 0) or 0) > 0 and skill_scoring_weight(item) > 0
+    ]
+    total_weight = sum(skill_scoring_weight(item) for item in relevant_skills)
+    if total_weight <= 0:
+        return 0.0
+
+    weighted_evidence = sum(
+        skill_scoring_weight(item) * clamp_float(item.get("evidence_level"), 0.0, 3.0)
+        for item in relevant_skills
+    )
+    return max(0.0, min(1.0, weighted_evidence / (total_weight * 3)))
+
+
+def apply_weighted_technical_bonus(
+    section_scores: dict[str, dict[str, Any]],
+    skill_assessment: list[dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    coverage = weighted_skill_coverage(skill_assessment)
+    if coverage <= 0 or "Technical Skills" not in section_scores:
+        return section_scores
+
+    normalized = {section: dict(info) for section, info in section_scores.items()}
+    technical_score = normalized["Technical Skills"]
+    max_score = float(technical_score.get("max_score") or SECTION_WEIGHTS["Technical Skills"])
+    current_score = clamp_float(technical_score.get("score"), 0.0, max_score)
+    bonus = rounded_score(WEIGHTED_TECHNICAL_BONUS_MAX * coverage)
+    if bonus <= 0:
+        return section_scores
+
+    next_score = rounded_score(min(max_score, current_score + bonus))
+    raw_score = clamp_float(technical_score.get("raw_score", current_score), 0.0, 100.0)
+    technical_score["raw_score"] = rounded_score(raw_score + bonus)
+    technical_score["score"] = next_score
+    technical_score["comment"] = (
+        f"{technical_score.get('comment', '')} "
+        f"Điểm được cộng nhẹ theo weighted skill coverage khoảng {int(round(coverage * 100))}%."
+    ).strip()
+    strengths = normalize_list(technical_score.get("strengths"))
+    if coverage >= 0.45:
+        strengths.append("Các kỹ năng có trọng số cao đang có bằng chứng tương đối tốt trong CV.")
+    technical_score["strengths"] = list(dict.fromkeys(strengths))
+    normalized["Technical Skills"] = technical_score
+    return normalized
+
+
 def normalize_gpt_issues(gpt_payload: dict[str, Any] | None) -> list[dict[str, Any]]:
     if not gpt_payload:
         return []
@@ -1487,8 +1632,13 @@ def compute_criteria_scores(
 
     relevant_skills = [item for item in skill_assessment if item["importance"] > 0]
     if relevant_skills:
-        weighted_found = sum(item["importance"] * item["evidence_level"] for item in relevant_skills)
-        weighted_total = sum(item["importance"] * 3 for item in relevant_skills)
+        weight_sum = sum(skill_scoring_weight(item) for item in relevant_skills)
+        if weight_sum > 0:
+            weighted_found = sum(skill_scoring_weight(item) * item["evidence_level"] for item in relevant_skills)
+            weighted_total = weight_sum * 3
+        else:
+            weighted_found = sum(item["importance"] * item["evidence_level"] for item in relevant_skills)
+            weighted_total = sum(item["importance"] * 3 for item in relevant_skills)
         keyword_score = percentage(weighted_found, weighted_total)
     else:
         keyword_score = 60
@@ -1555,11 +1705,14 @@ def build_issues(
             }
         )
 
-    missing_core = [
-        item["skill"]
-        for item in skill_assessment
-        if item["importance"] == 3 and item["evidence_level"] == 0
-    ]
+    missing_core = sorted(
+        [
+            item
+            for item in skill_assessment
+            if item["importance"] == 3 and item["evidence_level"] == 0
+        ],
+        key=lambda item: (-skill_scoring_weight(item), item["skill"]),
+    )
     if missing_core:
         issues.append(
             {
@@ -1568,16 +1721,19 @@ def build_issues(
                 "severity": "high",
                 "severity_label": "Cần ưu tiên",
                 "title": "Thiếu từ khóa nền tảng của vị trí mục tiêu",
-                "description": f"CV chưa thể hiện rõ: {', '.join(missing_core[:4])}.",
+                "description": f"CV chưa thể hiện rõ: {', '.join(item['skill'] for item in missing_core[:4])}.",
                 "impact": "ATS và nhà tuyển dụng có thể bỏ sót mức độ phù hợp với role.",
             }
         )
 
-    weak_evidence = [
-        item["skill"]
-        for item in skill_assessment
-        if item["importance"] >= 2 and item["evidence_level"] == 2
-    ]
+    weak_evidence = sorted(
+        [
+            item
+            for item in skill_assessment
+            if item["importance"] >= 2 and item["evidence_level"] == 2
+        ],
+        key=lambda item: (-skill_scoring_weight(item), item["skill"]),
+    )
     if weak_evidence:
         issues.append(
             {
@@ -1586,7 +1742,7 @@ def build_issues(
                 "severity": "medium",
                 "severity_label": "Nên cải thiện",
                 "title": "Kỹ năng mới được liệt kê, chưa có ngữ cảnh sử dụng",
-                "description": f"Một số kỹ năng nên được gắn với dự án hoặc kinh nghiệm: {', '.join(weak_evidence[:4])}.",
+                "description": f"Một số kỹ năng nên được gắn với dự án hoặc kinh nghiệm: {', '.join(item['skill'] for item in weak_evidence[:4])}.",
                 "impact": "Bằng chứng trong dự án/kinh nghiệm giúp điểm kỹ năng đáng tin hơn.",
             }
         )
@@ -1660,7 +1816,10 @@ def build_priority_actions(issues: list[dict[str, Any]], skill_assessment: list[
         elif issue["issue_id"] == "ISSUE_CORE_KEYWORDS":
             missing = [
                 item["skill"]
-                for item in skill_assessment
+                for item in sorted(
+                    skill_assessment,
+                    key=lambda value: (-skill_scoring_weight(value), value["skill"]),
+                )
                 if item["importance"] == 3 and item["evidence_level"] == 0
             ]
             actions.append(f"Thêm kỹ năng cốt lõi nếu đúng với kinh nghiệm thực tế: {', '.join(missing[:4])}.")
@@ -1705,6 +1864,7 @@ def analyze_sections(
     )
     gpt_payload = gpt_review.payload if gpt_review else None
     section_scores = apply_gpt_section_scores(section_scores, gpt_payload)
+    section_scores = apply_weighted_technical_bonus(section_scores, skill_assessment)
     section_scores = attach_section_sub_scores(section_scores, skill_assessment)
     criteria_scores = compute_criteria_scores(
         sections=sections,
@@ -1715,7 +1875,8 @@ def analyze_sections(
     )
     section_total = int(round(sum(float(item["score"]) for item in section_scores.values())))
     section_total = max(0, min(100, section_total))
-    total_score = int(round(section_total * TOTAL_SCORE_SCALE))
+    weighted_bonus = int(round(weighted_skill_coverage(skill_assessment) * WEIGHTED_TOTAL_BONUS_MAX))
+    total_score = int(round(section_total * TOTAL_SCORE_SCALE)) + weighted_bonus
     total_score = max(0, min(100, total_score))
     classification, summary = classify_score(total_score)
     if gpt_payload and isinstance(gpt_payload.get("overall_comment"), str) and gpt_payload["overall_comment"].strip():
@@ -1760,7 +1921,7 @@ def analyze_sections(
         "weaknesses": weaknesses[:4],
         "priority_actions": priority_actions,
         "readiness_level": readiness_level,
-        "scoring_config_version": SCORING_CONFIG_VERSION,
+        "scoring_config_version": role.get("scoring_config_version") or SCORING_CONFIG_VERSION,
         "model_version": gpt_review.model_version if gpt_review else "rule-based-local",
         "prompt_version": gpt_review.prompt_version if gpt_review else None,
         "analysis_method": "gpt" if gpt_review else "rule_based",

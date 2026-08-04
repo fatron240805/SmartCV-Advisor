@@ -172,25 +172,41 @@ function phaseBadge(index: number) {
   };
 }
 
-function phaseSkillGroups(phase: RoadmapPhase, index: number) {
-  const fallbackGroups = [
-    ['Data Structures & Algorithms', 'SQL'],
-    ['Generative AI', 'LLMs & Prompt Engineering'],
-    ['RAG Systems', 'Model Serving'],
-    ['CI/CD Pipelines', 'Cloud Platforms'],
-  ];
-  const groupTitles = fallbackGroups[index] ?? ['Skill Focus', 'Practice Focus'];
+const roadmapSkillGroupLibrary: { title: string; matches: string[] }[] = [
+  { title: 'Data Structures & Algorithms', matches: ['data structures', 'algorithm', 'array', 'linked list', 'stack', 'queue', 'tree', 'graph'] },
+  { title: 'Mathematics & Statistics', matches: ['mathematics', 'statistics', 'probability', 'linear algebra', 'calculus'] },
+  { title: 'OOP & Design Patterns', matches: ['oop', 'object oriented', 'object-oriented', 'design pattern', 'solid'] },
+  { title: 'SQL', matches: ['sql', 'postgres', 'postgresql', 'mysql', 'database query'] },
+  { title: 'Python', matches: ['python'] },
+  { title: 'Data Processing', matches: ['pandas', 'numpy', 'data wrangling', 'feature engineering'] },
+  { title: 'Machine Learning', matches: ['machine learning', 'deep learning', 'scikit', 'model training', 'mlflow'] },
+  { title: 'Generative AI', matches: ['generative ai', 'openai', 'gemini', 'claude'] },
+  { title: 'LLMs & Prompt Engineering', matches: ['llm', 'prompt'] },
+  { title: 'RAG Systems', matches: ['rag', 'retrieval', 'vector database', 'vector db', 'embedding', 'langchain', 'llamaindex', 'langgraph'] },
+  { title: 'Model Serving', matches: ['model serving', 'fastapi', 'api development'] },
+  { title: 'Frontend', matches: ['frontend', 'react', 'typescript', 'javascript', 'html', 'css', 'tailwind'] },
+  { title: 'CI/CD Pipelines', matches: ['ci/cd', 'github actions', 'testing strategies'] },
+  { title: 'Cloud Platforms', matches: ['cloud', 'aws', 'gcp', 'azure'] },
+  { title: 'Containers', matches: ['docker', 'container'] },
+];
+
+function roadmapSkillGroupTitle(skill: string) {
+  const normalized = normalizeSkillName(skill);
+  const matched = roadmapSkillGroupLibrary.find((group) => group.matches.some((keyword) => normalized.includes(keyword)));
+  return matched?.title ?? 'Skill Focus';
+}
+
+function phaseSkillGroups(phase: RoadmapPhase) {
   const skills = phase.skills.length ? phase.skills : [];
   if (!skills.length) return [];
-  const splitAt = Math.ceil(skills.length / Math.min(2, skills.length));
-  const chunks = skills.length > 1 ? [skills.slice(0, splitAt), skills.slice(splitAt)] : [skills];
+  const grouped = new Map<string, string[]>();
 
-  return chunks
-    .filter((items) => items.length > 0)
-    .map((items, groupIndex) => ({
-      title: groupTitles[groupIndex] ?? `Nhóm kỹ năng ${groupIndex + 1}`,
-      items,
-    }));
+  skills.forEach((skill) => {
+    const title = roadmapSkillGroupTitle(skill);
+    grouped.set(title, [...(grouped.get(title) ?? []), skill]);
+  });
+
+  return Array.from(grouped.entries()).map(([title, items]) => ({ title, items }));
 }
 
 const roadmapSkillTopicLibrary: { matches: string[]; topics: string[] }[] = [
@@ -671,7 +687,7 @@ function RoadmapTree({ phases, roleName }: { phases: RoadmapPhase[]; roleName?: 
           {visiblePhases.map((phase, index) => {
             const { phaseLabel, title } = splitPhaseTitle(phase.phase);
             const badge = phaseBadge(index);
-            const groups = phaseSkillGroups(phase, index);
+            const groups = phaseSkillGroups(phase);
             const isOpen = openPhases.has(index);
 
             return (
