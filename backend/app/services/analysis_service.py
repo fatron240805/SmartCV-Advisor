@@ -2197,7 +2197,6 @@ async def resolve_quota_state(db: Any, user_id: str, now: datetime) -> dict[str,
             "limit": configured_limit,
             "is_unlimited": configured_limit == -1,
             "period_start": lifecycle["period_start"],
-            "auto_renew": bool(usage_doc.get("TuDongGiaHan", True)),
             "expires_at": usage_doc.get("HanSuDung"),
         }
 
@@ -2249,7 +2248,6 @@ async def resolve_quota_state(db: Any, user_id: str, now: datetime) -> dict[str,
         "limit": limit,
         "is_unlimited": is_unlimited,
         "period_start": period_start,
-        "auto_renew": False,
         "expires_at": None,
     }
 

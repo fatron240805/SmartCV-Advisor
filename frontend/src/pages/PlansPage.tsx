@@ -5,7 +5,7 @@ import { formatPlanDuration, formatPlanExpiry, getPremiumComingSoon, PREMIUM_FEA
 import { FreePricingCard, PremiumPricingCard } from '../components/PricingCards';
 
 // ─────────────────────── Types ───────────────────────
-type PlanAction = 'upgrade-30' | 'upgrade-90' | 'renew' | 'cancel' | null;
+type PlanAction = 'upgrade-30' | 'upgrade-90' | 'renew' | null;
 type PayStep = 'method' | 'details' | 'processing' | 'done';
 type PayMethod = 'bank' | 'momo' | 'vnpay';
 
@@ -17,7 +17,6 @@ interface QuotaData {
   used: number;
   limit: number | null;
   label: string;
-  auto_renew: boolean;
   expires_at: string | null;
 }
 
@@ -74,7 +73,7 @@ function PaymentModal({
   const [progress, setProgress] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  if (!action || action === 'cancel') return null;
+  if (!action) return null;
 
   const renewCycle = currentPlanId === 'DV_PREMIUM_90' ? '90' : '30';
   const planKey = action === 'renew' ? `renew-${renewCycle}` : action;
@@ -287,43 +286,12 @@ function PaymentModal({
   );
 }
 
-// ─────────────────────── Cancel Modal ───────────────────────
-function CancelModal({ onConfirm, onCancel, loading, error }: {
-  onConfirm: () => void; onCancel: () => void; loading: boolean; error: string;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-2xl">
-        <h2 className="text-xl font-bold text-slate-900">Hủy gói Premium</h2>
-        <p className="mt-3 text-sm leading-relaxed text-slate-600">
-          Sau khi xác nhận, bạn vẫn được sử dụng đầy đủ quyền lợi <strong>Premium</strong> đến hết thời hạn đã đăng ký.
-          Khi chu kỳ Premium kết thúc, tài khoản mới chuyển về gói <strong>Free</strong> và được cấp 3 lượt phân tích
-          cho chu kỳ Free mới. Toàn bộ lịch sử phân tích vẫn được giữ nguyên.
-        </p>
-        {error && <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{error}</div>}
-        <div className="mt-6 flex gap-3">
-          <button onClick={onCancel} disabled={loading}
-            className="flex-1 rounded-2xl border border-slate-200 py-3 font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50">
-            Giữ gói Premium
-          </button>
-          <button onClick={onConfirm} disabled={loading}
-            className="flex-1 rounded-2xl bg-red-600 py-3 font-bold text-white transition hover:bg-red-700 disabled:opacity-50">
-            {loading ? 'Đang xử lý...' : 'Hủy gói'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ─────────────────────── Plan Cards ───────────────────────
-function CurrentPremiumCard({ cycle, servicePlan, cancelled, expiresAt, onRenew, onCancel }: {
+function CurrentPremiumCard({ cycle, servicePlan, expiresAt, onRenew }: {
   cycle: PremiumCycle;
   servicePlan?: ServicePlan;
-  cancelled: boolean;
   expiresAt?: string | null;
   onRenew: () => void;
-  onCancel: () => void;
 }) {
   const plan = PREMIUM_PLANS[cycle];
   const features = servicePlan?.features?.length ? servicePlan.features : PREMIUM_FEATURES;
@@ -363,24 +331,7 @@ function CurrentPremiumCard({ cycle, servicePlan, cancelled, expiresAt, onRenew,
           </div>
         )}
       </div>
-      <div className="mt-7 flex flex-col gap-3">
-        <button onClick={onRenew} className="w-full rounded-xl bg-emerald-600 py-3.5 font-bold text-white transition hover:bg-emerald-700 active:scale-95">Gia hạn gói hiện tại</button>
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={cancelled}
-          className={cancelled
-            ? 'w-full cursor-not-allowed rounded-xl border border-slate-200 bg-slate-100 py-3.5 font-semibold text-slate-400'
-            : 'w-full rounded-xl border border-red-200 py-3.5 font-semibold text-red-600 transition hover:bg-red-50 active:scale-95'}
-        >
-          {cancelled ? 'Đã hủy gói' : 'Hủy gói'}
-        </button>
-        {cancelled && expiryLabel && (
-          <p className="text-center text-xs leading-5 text-slate-500">
-            Sau ngày {expiryLabel}, tài khoản sẽ chuyển về gói Free.
-          </p>
-        )}
-      </div>
+      <button onClick={onRenew} className="mt-7 w-full rounded-xl bg-emerald-600 py-3.5 font-bold text-white transition hover:bg-emerald-700 active:scale-95">Gia hạn gói hiện tại</button>
     </div>
   );
 }
@@ -390,9 +341,6 @@ export default function PlansPage() {
   const [quota, setQuota] = useState<QuotaData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [payAction, setPayAction] = useState<PlanAction>(null);
-  const [showCancel, setShowCancel] = useState(false);
-  const [cancelLoading, setCancelLoading] = useState(false);
-  const [cancelError, setCancelError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [selectedCycle, setSelectedCycle] = useState<PremiumCycle>('30');
   const [servicePlans, setServicePlans] = useState<ServicePlan[]>([]);
@@ -440,27 +388,6 @@ export default function PlansPage() {
   const handlePaySuccess = async (msg: string) => {
     setSuccessMsg(msg);
     await refreshQuota();
-  };
-
-  const handleCancel = async () => {
-    setCancelLoading(true);
-    setCancelError('');
-    try {
-      const response = await apiService.cancelPlan();
-      setShowCancel(false);
-      const expiry = new Date(response.data.expires_at).toLocaleDateString('vi-VN');
-      setQuota((current) => current ? {
-        ...current,
-        auto_renew: false,
-        expires_at: response.data.expires_at,
-      } : current);
-      setSuccessMsg(`Đã hủy gói. Bạn vẫn được dùng Premium đến hết ngày ${expiry}.`);
-      await refreshQuota().catch(() => undefined);
-    } catch (err) {
-      setCancelError(getApiErrorMessage(err));
-    } finally {
-      setCancelLoading(false);
-    }
   };
 
   if (isLoading) return <div className="flex justify-center py-20 text-slate-400">Đang tải gói dịch vụ...</div>;
@@ -525,10 +452,8 @@ export default function PlansPage() {
             <CurrentPremiumCard
               cycle="30"
               servicePlan={planForCycle('30')}
-              cancelled={quota?.auto_renew === false}
               expiresAt={quota?.expires_at}
               onRenew={() => setPayAction('renew')}
-              onCancel={() => { setCancelError(''); setShowCancel(true); }}
             />
           ) : (
             <PremiumPricingCard cycle="90" plan={planForCycle('90')} recommended actionLabel="Nâng cấp Premium" onAction={() => setPayAction('upgrade-90')} />
@@ -541,10 +466,8 @@ export default function PlansPage() {
           <CurrentPremiumCard
             cycle="90"
             servicePlan={planForCycle('90')}
-            cancelled={quota?.auto_renew === false}
             expiresAt={quota?.expires_at}
             onRenew={() => setPayAction('renew')}
-            onCancel={() => { setCancelError(''); setShowCancel(true); }}
           />
         </div>
       )}
@@ -555,21 +478,13 @@ export default function PlansPage() {
           : 'Thanh toán bảo mật. Gói được kích hoạt ngay sau khi xác nhận.'}
       </p>
 
-      {payAction && payAction !== 'cancel' && (
+      {payAction && (
         <PaymentModal
           action={payAction}
           currentPlanId={currentPlanId}
           servicePlans={servicePlans}
           onSuccess={handlePaySuccess}
           onClose={() => setPayAction(null)}
-        />
-      )}
-      {showCancel && (
-        <CancelModal
-          onConfirm={handleCancel}
-          onCancel={() => setShowCancel(false)}
-          loading={cancelLoading}
-          error={cancelError}
         />
       )}
     </div>

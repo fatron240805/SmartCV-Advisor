@@ -324,7 +324,6 @@ export const apiService = {
       limit: number | null;
       remaining: number | null;
       label: string;
-      auto_renew: boolean;
       expires_at: string | null;
     };
   }> => {
@@ -563,11 +562,6 @@ export const apiService = {
 
   renewPlan: async (): Promise<{ data: { plan_id: string; new_expiry: string }; meta: { message: string } }> => {
     const response = await apiClient.post('/users/me/renew-plan');
-    return response.data;
-  },
-
-  cancelPlan: async (): Promise<{ data: { account_type: string; expires_at: string; auto_renew: boolean }; meta: { message: string } }> => {
-    const response = await apiClient.post('/users/me/cancel-plan');
     return response.data;
   },
 

@@ -130,7 +130,6 @@ async def get_my_quota(user: dict[str, str] = Depends(get_current_user)) -> dict
                 "limit": None if is_unlimited else limit,
                 "remaining": remaining,
                 "label": label,
-                "auto_renew": state.get("auto_renew", False),
                 "expires_at": state["expires_at"].isoformat() if state.get("expires_at") else None,
             },
             "error": None,
@@ -145,7 +144,6 @@ async def get_my_quota(user: dict[str, str] = Depends(get_current_user)) -> dict
                 "limit": 3,
                 "remaining": 3,
                 "label": "3/3 lượt còn lại",
-                "auto_renew": False,
                 "expires_at": None,
             },
             "error": None,
@@ -205,7 +203,6 @@ async def change_plan(
                     "MaGoiDV": new_plan_id,
                     "NgayBatDau": now,
                     "HanSuDung": add_plan_duration(now, duration_days),
-                    "TuDongGiaHan": True,
                     "PlanSnapshot": {
                         "TenGoi": plan_document.get("TenGoi"),
                         "HanSuDung": duration_days,
@@ -277,39 +274,5 @@ async def renew_plan(
     return {
         "data": {"plan_id": plan_id, "new_expiry": new_expiry.isoformat()},
         "meta": {"message": f"Gia hạn gói {duration_days} ngày thành công."},
-        "error": None,
-    }
-
-
-@router.post("/me/cancel-plan", summary="Hủy gói Premium")
-async def cancel_plan(
-    user: dict[str, str] = Depends(get_customer_user),
-) -> dict[str, Any]:
-    """Đánh dấu hủy; quyền Premium vẫn còn hiệu lực đến hết ngày đã thanh toán."""
-    from datetime import datetime, timezone
-    from fastapi import HTTPException
-
-    user_id = user["user_id"]
-    now = datetime.now(timezone.utc)
-
-    customer = await db["KHACHHANG"].find_one({"_id": user_id})
-    if not customer or customer.get("LoaiKH") != "premium":
-        raise HTTPException(status_code=400, detail={"code": "NOT_PREMIUM", "message": "Tài khoản hiện không phải Premium."})
-
-    usage_doc = await db["LUOTDUNG"].find_one(
-        {"MaKH": user_id, "MaGoiDV": {"$in": list(PREMIUM_PLAN_IDS)}},
-        sort=[("HanSuDung", -1)],
-    )
-    if not usage_doc or not usage_doc.get("HanSuDung"):
-        raise HTTPException(status_code=400, detail={"code": "PLAN_NOT_FOUND", "message": "Không tìm thấy chu kỳ Premium đang hoạt động."})
-
-    await db["LUOTDUNG"].update_one(
-        {"_id": usage_doc["_id"]},
-        {"$set": {"TuDongGiaHan": False, "NgayYeuCauHuy": now}},
-    )
-
-    return {
-        "data": {"account_type": "premium", "expires_at": usage_doc["HanSuDung"].isoformat(), "auto_renew": False},
-        "meta": {"message": "Đã hủy gói. Quyền lợi Premium vẫn dùng được đến ngày hết hạn."},
         "error": None,
     }
