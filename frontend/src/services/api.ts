@@ -99,8 +99,10 @@ export interface AdminAnalyticsSummary {
     message_variants: AnalyticsBreakdownItem[];
   };
   conversion: {
+    visitor_to_registration: number;
     registration_to_analysis: number;
     registered_to_premium: number;
+    visitor_count: number;
     registered_count: number;
     premium_count: number;
   };

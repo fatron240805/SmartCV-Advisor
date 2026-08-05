@@ -85,38 +85,51 @@ function SectionHeading({ title, description }: { title: string; description: st
 }
 
 function MetricCard({
+  category,
   label,
   value,
   detail,
   tone,
   progress,
+  featured = false,
 }: {
+  category: string;
   label: string;
   value: string;
   detail: string;
   tone: 'slate' | 'blue' | 'emerald' | 'amber';
   progress?: number;
+  featured?: boolean;
 }) {
   const tones = {
-    slate: { border: 'border-slate-200', badge: 'bg-slate-100 text-slate-600', bar: 'bg-slate-600' },
-    blue: { border: 'border-blue-200', badge: 'bg-blue-50 text-blue-700', bar: 'bg-blue-600' },
-    emerald: { border: 'border-emerald-200', badge: 'bg-emerald-50 text-emerald-700', bar: 'bg-emerald-600' },
-    amber: { border: 'border-amber-200', badge: 'bg-amber-50 text-amber-700', bar: 'bg-amber-500' },
+    slate: { border: 'border-slate-200', category: 'text-slate-500', accent: 'bg-slate-500', bar: 'bg-slate-600' },
+    blue: { border: 'border-blue-200', category: 'text-blue-700', accent: 'bg-blue-600', bar: 'bg-blue-600' },
+    emerald: { border: 'border-emerald-200', category: 'text-emerald-700', accent: 'bg-emerald-600', bar: 'bg-emerald-600' },
+    amber: { border: 'border-amber-200', category: 'text-amber-700', accent: 'bg-amber-500', bar: 'bg-amber-500' },
   }[tone];
+  const safeProgress = progress === undefined ? undefined : Math.min(100, Math.max(0, progress));
 
   return (
-    <article className={`flex min-h-52 flex-col rounded-2xl border bg-white p-5 shadow-sm ${tones.border}`}>
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-sm font-semibold leading-5 text-slate-700">{label}</p>
-        <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${tones.badge}`}>Chỉ số</span>
+    <article className={`relative flex h-full flex-col overflow-hidden rounded-2xl border bg-white p-5 shadow-sm transition-shadow hover:shadow-md ${tones.border} ${featured ? 'lg:col-span-2 lg:p-6' : ''}`}>
+      <div className={`absolute inset-x-0 top-0 h-1 ${tones.accent}`} aria-hidden="true" />
+      <div>
+        <p className={`text-xs font-bold uppercase tracking-wider ${tones.category}`}>{category}</p>
+        <h3 className="mt-2 max-w-xl text-sm font-semibold leading-5 text-slate-700">{label}</h3>
       </div>
-      <p className="mt-5 text-4xl font-bold tracking-tight text-slate-950">{value}</p>
-      {progress !== undefined && (
-        <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100" aria-label={`Mức chuyển đổi ${formatPercent(progress)}`}>
-          <div className={`h-full rounded-full ${tones.bar}`} style={{ width: `${Math.min(100, Math.max(0, progress))}%` }} />
+      <p className={`mt-5 font-bold tracking-tight text-slate-950 ${featured ? 'text-5xl' : 'text-4xl'}`}>{value}</p>
+      {safeProgress !== undefined && (
+        <div
+          className="mt-4 h-2.5 overflow-hidden rounded-full bg-slate-100"
+          role="progressbar"
+          aria-label={`${label}: ${formatPercent(safeProgress)}`}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={safeProgress}
+        >
+          <div className={`h-full rounded-full transition-[width] duration-500 ${tones.bar}`} style={{ width: `${safeProgress}%` }} />
         </div>
       )}
-      <p className="mt-auto pt-4 text-xs leading-5 text-slate-500">{detail}</p>
+      <p className="mt-auto border-t border-slate-100 pt-4 text-sm leading-6 text-slate-500">{detail}</p>
     </article>
   );
 }
@@ -168,8 +181,8 @@ function LoadingState() {
     <div className="space-y-5" role="status" aria-live="polite">
       <span className="sr-only">Đang tải dữ liệu thống kê</span>
       <div className="h-28 animate-pulse rounded-2xl bg-slate-200" />
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {[0, 1, 2, 3].map((item) => <div key={item} className="h-52 animate-pulse rounded-2xl bg-slate-200" />)}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {[0, 1, 2, 3, 4].map((item) => <div key={item} className="h-52 animate-pulse rounded-2xl bg-slate-200" />)}
       </div>
       <div className="h-96 animate-pulse rounded-2xl bg-slate-200" />
     </div>
@@ -303,29 +316,42 @@ export default function AdminAnalyticsPage() {
       ) : data ? (
         <div className="space-y-8">
           <section aria-labelledby="overview-heading">
-            <div id="overview-heading"><SectionHeading title="Tổng quan nhanh" description="Bốn chỉ số quan trọng nhất để đánh giá mức sử dụng, khả năng tạo giá trị và mức hài lòng." /></div>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div id="overview-heading"><SectionHeading title="Tổng quan nhanh" description="Các chỉ số quan trọng để đánh giá mức thu hút, mức sử dụng, khả năng tạo giá trị và mức hài lòng." /></div>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <MetricCard
+                category="Người dùng"
                 label="Tổng lượt hoàn tất đăng ký"
                 value={formatNumber(data.funnel.registrations)}
                 detail="Số sự kiện tạo tài khoản thành công trong khoảng thời gian đã chọn."
                 tone="slate"
               />
               <MetricCard
-                label="Tỷ lệ hoàn thành phân tích CV trên tổng lượt đăng ký"
+                category="Chuyển đổi chính"
+                label="Tỷ lệ chuyển đổi từ người quan tâm sang người dùng"
+                value={formatPercent(data.conversion.visitor_to_registration)}
+                detail={`${formatNumber(data.conversion.registered_count)} lượt đăng ký thành công trên ${formatNumber(data.conversion.visitor_count)} lượt truy cập trang chủ.`}
+                tone="blue"
+                progress={data.conversion.visitor_to_registration}
+                featured
+              />
+              <MetricCard
+                category="Kích hoạt"
+                label="Tỷ lệ đăng ký hoàn thành phân tích CV"
                 value={formatPercent(data.conversion.registration_to_analysis)}
-                detail={`${formatNumber(data.funnel.analyses_completed)} lượt hoàn thành phân tích / ${formatNumber(data.conversion.registered_count)} lượt đăng ký`}
+                detail={`${formatNumber(data.funnel.analyses_completed)} lượt hoàn thành phân tích trên ${formatNumber(data.conversion.registered_count)} lượt đăng ký.`}
                 tone="blue"
                 progress={data.conversion.registration_to_analysis}
               />
               <MetricCard
-                label="Tỷ lệ nâng cấp Premium trên tổng lượt đăng ký"
+                category="Doanh thu"
+                label="Tỷ lệ đăng ký nâng cấp Premium"
                 value={formatPercent(data.conversion.registered_to_premium)}
-                detail={`${formatNumber(data.conversion.premium_count)} lượt nâng cấp Premium / ${formatNumber(data.conversion.registered_count)} lượt đăng ký`}
+                detail={`${formatNumber(data.conversion.premium_count)} lượt nâng cấp Premium trên ${formatNumber(data.conversion.registered_count)} lượt đăng ký.`}
                 tone="emerald"
                 progress={data.conversion.registered_to_premium}
               />
               <MetricCard
+                category="Trải nghiệm"
                 label="Điểm hài lòng trung bình"
                 value={`${Number(data.avg_rating ?? 0).toFixed(1)} / 5`}
                 detail={`Tính từ ${formatNumber(data.feedback_count)} phản hồi của người dùng.`}

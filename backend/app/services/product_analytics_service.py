@@ -239,9 +239,10 @@ async def get_analytics_summary(
     completed = int(counts["analysis_completed"])
     analyses_started = int(counts["analysis_started"])
     premium_count = int(counts["premium_converted"])
+    landing_page_views = int(counts["landing_page_view"])
 
     funnel = {
-        "landing_page_views": int(counts["landing_page_view"]),
+        "landing_page_views": landing_page_views,
         "registrations": registrations,
         "cv_selections": int(cv_selection_actors),
         "uploads_completed": uploads,
@@ -312,8 +313,10 @@ async def get_analytics_summary(
             "message_variants": variants,
         },
         "conversion": {
+            "visitor_to_registration": calculate_conversion_rate(registrations, landing_page_views),
             "registration_to_analysis": calculate_conversion_rate(completed, registrations),
             "registered_to_premium": calculate_conversion_rate(premium_count, registrations),
+            "visitor_count": landing_page_views,
             "registered_count": registrations,
             "premium_count": premium_count,
         },
