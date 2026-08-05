@@ -19,7 +19,7 @@ OPENAI_IMAGE_MODEL = os.getenv("OPENAI_IMAGE_MODEL", OPENAI_MODEL)
 OPENAI_TIMEOUT_SECONDS = float(os.getenv("OPENAI_TIMEOUT_SECONDS", "30"))
 GPT_SECTION_PROMPT_VERSION = "cv-section-parser-gpt-v1"
 GPT_IMAGE_PROMPT_VERSION = "cv-image-parser-gpt-v1"
-GPT_REVIEW_PROMPT_VERSION = "cv-role-review-notebook-rubric-v3"
+GPT_REVIEW_PROMPT_VERSION = "cv-role-review-notebook-rubric-v4-admin-weight"
 
 IMPORTANCE_LABELS = {
     0: "Không cần có",
@@ -359,6 +359,22 @@ User ID: {user_id}
         return None
 
 
+def format_number(value: Any) -> str | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return str(int(number)) if number.is_integer() else f"{number:.1f}"
+
+
+def role_skill_sort_key(item: dict[str, Any]) -> tuple[float, int, str]:
+    try:
+        weight = float(item.get("weight", 0) or 0)
+    except (TypeError, ValueError):
+        weight = 0.0
+    return (-weight, -int(item.get("importance", 0)), str(item.get("skill", "")))
+
+
 def build_role_skill_text(role: dict[str, Any]) -> str:
     lines: list[str] = []
     grouped: dict[str, list[dict[str, Any]]] = {}
@@ -368,9 +384,19 @@ def build_role_skill_text(role: dict[str, Any]) -> str:
 
     for group, skills in grouped.items():
         lines.append(f"### {group}")
-        for item in sorted(skills, key=lambda value: (-int(value.get("importance", 0)), str(value.get("skill", "")))):
+        for item in sorted(skills, key=role_skill_sort_key):
             importance = int(item.get("importance", 0))
-            lines.append(f"- [{importance}] {item.get('skill', '')} ({IMPORTANCE_LABELS.get(importance, 'Không cần có')})")
+            details = [IMPORTANCE_LABELS.get(importance, "Không cần có")]
+            weight = format_number(item.get("weight"))
+            if weight is not None:
+                details.append(f"weight={weight}%")
+            required_score = format_number(item.get("required_score"))
+            if required_score is not None:
+                details.append(f"required_score={required_score}")
+            criteria_description = str(item.get("criteria_description", "") or "").strip()
+            if criteria_description:
+                details.append(f"criteria={criteria_description[:180]}")
+            lines.append(f"- [{importance}] {item.get('skill', '')} ({'; '.join(details)})")
     return "\n".join(lines)
 
 
@@ -462,6 +488,9 @@ QUY TẮC CHẤM TECHNICAL SKILLS:
    - Nhóm skill_score 3 chiếm trọng số chính.
    - Nhóm skill_score 2 chiếm trọng số bổ trợ quan trọng.
    - Nhóm skill_score 1 là điểm cộng thêm.
+   - Nếu mỗi skill có weight %, hãy ưu tiên skill weight cao hơn trong cùng nhóm skill_score.
+   - Weighted coverage tham chiếu = sum(weight * evidence_level / 3) / sum(weight) cho các skill có score 1-3.
+   - required_score và criteria là ngưỡng/mô tả admin dùng để diễn giải độ khớp, không được tự bịa evidence nếu CV không có.
    - Không trừ điểm tuyến tính theo số lượng skill thiếu trong toàn dataset.
    - Nếu CV có ít skill nhưng đều là skill cốt lõi của role và có bằng chứng mạnh, vẫn có thể đạt điểm cao.
 7. Có thể cộng raw_score vượt 35 nếu:
