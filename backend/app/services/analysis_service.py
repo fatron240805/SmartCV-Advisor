@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -10,6 +11,7 @@ from uuid import uuid4
 # pyrefly: ignore [missing-import]
 from fastapi import HTTPException, status
 # pyrefly: ignore [missing-import]
+from pymongo import ReturnDocument
 from pymongo.errors import ConfigurationError, PyMongoError, ServerSelectionTimeoutError
 
 from app.services.cv_service import STANDARD_SECTIONS, format_file_size, normalize_search_text
@@ -954,28 +956,72 @@ def normalize_role_document(document: dict[str, Any], skills: list[dict[str, Any
     }
 
 
-async def load_admin_role_skills(db: Any, role_id: str) -> list[dict[str, Any]]:
-    try:
-        relations = await db["NGANHNGHE_KYNANG"].find({"MaNganh": role_id}).to_list(length=300)
-    except Exception:
-        return []
+async def load_admin_role_skills_bulk(db: Any, role_ids: list[str]) -> dict[str, list[dict[str, Any]]]:
+    """Load role/skill/score data in bulk instead of issuing N+1 queries."""
 
-    skills: list[dict[str, Any]] = []
+    normalized_role_ids = sorted({str(role_id) for role_id in role_ids if role_id})
+    skills_by_role: dict[str, list[dict[str, Any]]] = {
+        role_id: [] for role_id in normalized_role_ids
+    }
+    if not normalized_role_ids:
+        return skills_by_role
+
+    try:
+        relations = await db["NGANHNGHE_KYNANG"].find(
+            {"MaNganh": {"$in": normalized_role_ids}}
+        ).to_list(length=max(300, len(normalized_role_ids) * 300))
+    except Exception:
+        return skills_by_role
+
+    skill_ids = sorted(
+        {str(relation.get("MaKyNang")) for relation in relations if relation.get("MaKyNang")}
+    )
+    if not skill_ids:
+        return skills_by_role
+
+    try:
+        skill_documents, score_documents = await asyncio.gather(
+            db["KYNANG"].find({"_id": {"$in": skill_ids}}).to_list(length=len(skill_ids)),
+            db["DIEMDANHGIA"].find(
+                {
+                    "MaKyNang": {"$in": skill_ids},
+                    "$or": [
+                        {"MaNganh": {"$in": normalized_role_ids}},
+                        {"MaNganh": {"$exists": False}},
+                    ],
+                }
+            ).to_list(length=max(len(skill_ids), len(skill_ids) * (len(normalized_role_ids) + 1))),
+        )
+    except Exception:
+        return skills_by_role
+
+    skill_by_id = {
+        str(document.get("_id")): document
+        for document in skill_documents
+        if document.get("_id")
+    }
+    role_score_by_key: dict[tuple[str, str], dict[str, Any]] = {}
+    legacy_score_by_skill: dict[str, dict[str, Any]] = {}
+    for score in score_documents:
+        skill_id = str(score.get("MaKyNang") or "")
+        if not skill_id:
+            continue
+        score_role_id = score.get("MaNganh")
+        if score_role_id:
+            role_score_by_key[(str(score_role_id), skill_id)] = score
+        else:
+            legacy_score_by_skill[skill_id] = score
+
     for relation in relations:
         if not is_active_status(relation.get("TrangThai", "active")):
             continue
 
-        try:
-            skill = await db["KYNANG"].find_one({"_id": relation.get("MaKyNang")})
-            score = await db["DIEMDANHGIA"].find_one({"MaNganh": role_id, "MaKyNang": relation.get("MaKyNang")})
-            if not score:
-                score = await db["DIEMDANHGIA"].find_one({"MaKyNang": relation.get("MaKyNang"), "MaNganh": {"$exists": False}})
-        except Exception:
-            continue
-
+        role_id = str(relation.get("MaNganh") or "")
+        skill_id = str(relation.get("MaKyNang") or "")
+        skill = skill_by_id.get(skill_id)
         if not skill:
             continue
-        score = score or {}
+        score = role_score_by_key.get((role_id, skill_id)) or legacy_score_by_skill.get(skill_id) or {}
         if not is_active_status(score.get("TrangThai", relation.get("TrangThai", "active"))):
             continue
 
@@ -994,7 +1040,7 @@ async def load_admin_role_skills(db: Any, role_id: str) -> list[dict[str, Any]]:
         importance = parse_importance_value(
             importance_source
         )
-        skills.append(
+        skills_by_role.setdefault(role_id, []).append(
             {
                 "skill": skill.get("TenKyNang", ""),
                 "group": skill.get("NhomKyNang") or relation.get("NhomKyNang") or skill.get("Nhom") or "General",
@@ -1006,10 +1052,27 @@ async def load_admin_role_skills(db: Any, role_id: str) -> list[dict[str, Any]]:
             }
         )
 
-    return sorted(skills, key=lambda item: (-skill_scoring_weight(item), -int(item.get("importance", 0)), item["skill"]))
+    for role_id, skills in skills_by_role.items():
+        skills_by_role[role_id] = sorted(
+            skills,
+            key=lambda item: (
+                -skill_scoring_weight(item),
+                -int(item.get("importance", 0)),
+                item["skill"],
+            ),
+        )
+    return skills_by_role
 
 
-async def list_career_roles(db: Any) -> list[dict[str, Any]]:
+async def load_admin_role_skills(db: Any, role_id: str) -> list[dict[str, Any]]:
+    return (await load_admin_role_skills_bulk(db, [role_id])).get(role_id, [])
+
+
+async def list_career_roles(
+    db: Any,
+    *,
+    include_skills: bool = True,
+) -> list[dict[str, Any]]:
     roles_by_id = {role["role_id"]: role for role in DEFAULT_ROLES}
     merged_roles = {role_id: dict(role) for role_id, role in roles_by_id.items()}
 
@@ -1024,13 +1087,28 @@ async def list_career_roles(db: Any) -> list[dict[str, Any]]:
         for document in documents
         if str(document.get("_id") or document.get("role_id")) in roles_by_id
     }
+    skills_by_role: dict[str, list[dict[str, Any]]] = {}
+    if include_skills:
+        skills_by_role = await load_admin_role_skills_bulk(
+            db,
+            sorted(
+                {
+                    LEGACY_ROLE_ID_ALIASES.get(
+                        str(document.get("_id") or document.get("role_id")),
+                        str(document.get("_id") or document.get("role_id")),
+                    )
+                    for document in documents
+                    if document.get("_id") or document.get("role_id")
+                }
+            ),
+        )
 
     for document in documents:
         role = normalize_role_document(document)
         original_role_id = str(role["role_id"])
         canonical_role_id = LEGACY_ROLE_ID_ALIASES.get(original_role_id, original_role_id)
         fallback = roles_by_id.get(canonical_role_id)
-        admin_skills = await load_admin_role_skills(db, canonical_role_id)
+        admin_skills = skills_by_role.get(canonical_role_id, [])
 
         if original_role_id != canonical_role_id and canonical_role_id in canonical_document_ids:
             continue
@@ -1053,15 +1131,89 @@ async def list_career_roles(db: Any) -> list[dict[str, Any]]:
         role["icon_label"] = ROLE_ICON_LABELS.get(canonical_role_id, role.get("icon_label", "IT"))
         merged_roles[canonical_role_id] = role
 
-    return sorted(merged_roles.values(), key=lambda item: item.get("name") or "")
+    roles = sorted(merged_roles.values(), key=lambda item: item.get("name") or "")
+    if include_skills:
+        return roles
+    return [
+        {
+            "role_id": role["role_id"],
+            "name": role.get("name"),
+            "description": role.get("description", ""),
+            "status": role.get("status", "active"),
+            "icon_label": role.get("icon_label", "IT"),
+            "scoring_config_version": role.get("scoring_config_version"),
+        }
+        for role in roles
+    ]
 
 
-async def get_role_by_id(db: Any, role_id: str) -> dict[str, Any]:
+async def get_role_by_id(
+    db: Any,
+    role_id: str,
+    *,
+    include_skills: bool = True,
+) -> dict[str, Any]:
     resolved_role_id = LEGACY_ROLE_ID_ALIASES.get(role_id, role_id)
-    roles = await list_career_roles(db)
-    for role in roles:
-        if role["role_id"] == resolved_role_id:
-            return role
+    fallback = next(
+        (role for role in DEFAULT_ROLES if role["role_id"] == resolved_role_id),
+        None,
+    )
+    candidate_ids = [resolved_role_id]
+    candidate_ids.extend(
+        legacy_id
+        for legacy_id, canonical_id in LEGACY_ROLE_ID_ALIASES.items()
+        if canonical_id == resolved_role_id and legacy_id != resolved_role_id
+    )
+
+    try:
+        documents = await db["NGANHNGHIET"].find(
+            {"_id": {"$in": candidate_ids}}
+        ).to_list(length=len(candidate_ids))
+    except Exception:
+        documents = []
+
+    document_by_id = {str(document.get("_id")): document for document in documents}
+    document = document_by_id.get(resolved_role_id)
+    if not document:
+        document = next(
+            (document_by_id[candidate_id] for candidate_id in candidate_ids if candidate_id in document_by_id),
+            None,
+        )
+
+    if document or fallback:
+        admin_skills = (
+            await load_admin_role_skills(db, resolved_role_id)
+            if include_skills
+            else []
+        )
+        if fallback:
+            merged_role = dict(fallback)
+            configured_role: dict[str, Any] | None = None
+            if document:
+                configured_role = normalize_role_document(document)
+                merged_role["status"] = configured_role["status"]
+                if str(document.get("_id")) == resolved_role_id:
+                    merged_role["name"] = configured_role["name"] or fallback["name"]
+                    merged_role["description"] = configured_role["description"] or fallback["description"]
+                    merged_role["scoring_config_version"] = configured_role.get("scoring_config_version")
+            merged_role["role_id"] = resolved_role_id
+            merged_role["skills"] = (
+                admin_skills
+                or (configured_role or {}).get("skills", [])
+                or merged_role.get("skills", [])
+            )
+            merged_role["icon_label"] = ROLE_ICON_LABELS.get(
+                resolved_role_id, merged_role.get("icon_label", "IT")
+            )
+            return merged_role
+
+        configured_role = normalize_role_document(document or {}, admin_skills)
+        configured_role["role_id"] = resolved_role_id
+        configured_role["icon_label"] = ROLE_ICON_LABELS.get(
+            resolved_role_id, configured_role.get("icon_label", "IT")
+        )
+        return configured_role
+
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
         detail={"code": "ROLE_NOT_FOUND", "message": "Không tìm thấy vị trí mục tiêu."},
@@ -1992,21 +2144,48 @@ async def resolve_quota_state(db: Any, user_id: str, now: datetime) -> dict[str,
       rồi đọc lại đúng bản ghi vừa tạo/đang có để lấy limit + NgayBatDau khớp với
       gói thực sự đang áp dụng (tránh dùng nhầm limit/period_start của gói cũ).
     """
-    customer = await db["KHACHHANG"].find_one({"_id": user_id})
+    customer, usage_documents = await asyncio.gather(
+        db["KHACHHANG"].find_one(
+            {"_id": user_id},
+            {"LoaiKH": 1},
+        ),
+        db["LUOTDUNG"].find(
+            {
+                "MaKH": user_id,
+                "MaGoiDV": {"$in": [DEFAULT_FREE_PLAN_ID, *sorted(PREMIUM_PLAN_IDS)]},
+            }
+        ).to_list(length=50),
+    )
     account_type = str((customer or {}).get("LoaiKH", "registered")).lower()
 
     # A legacy Free usage row still carries a datetime in HanSuDung for schema
     # compatibility. It must never outrank an active Premium lifecycle merely
     # because that cosmetic date happens to be later (notably at month-end).
-    usage_doc = await db["LUOTDUNG"].find_one(
-        {"MaKH": user_id, "MaGoiDV": {"$in": sorted(PREMIUM_PLAN_IDS)}},
-        sort=[("HanSuDung", -1)],
-    )
-    if not usage_doc:
-        usage_doc = await db["LUOTDUNG"].find_one(
-            {"MaKH": user_id, "MaGoiDV": DEFAULT_FREE_PLAN_ID},
-            sort=[("NgayBatDau", -1)],
+    def datetime_sort_value(value: Any) -> float:
+        if not isinstance(value, datetime):
+            return float("-inf")
+        normalized = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        return normalized.timestamp()
+
+    premium_usage = [
+        document
+        for document in usage_documents
+        if str(document.get("MaGoiDV") or "") in PREMIUM_PLAN_IDS
+    ]
+    free_usage = [
+        document
+        for document in usage_documents
+        if str(document.get("MaGoiDV") or "") == DEFAULT_FREE_PLAN_ID
+    ]
+    usage_doc = (
+        max(premium_usage, key=lambda item: datetime_sort_value(item.get("HanSuDung")))
+        if premium_usage
+        else (
+            max(free_usage, key=lambda item: datetime_sort_value(item.get("NgayBatDau")))
+            if free_usage
+            else None
         )
+    )
     lifecycle = evaluate_plan_lifecycle(account_type, usage_doc, now)
 
     if lifecycle["effective_account_type"] == "premium":
@@ -2023,13 +2202,17 @@ async def resolve_quota_state(db: Any, user_id: str, now: datetime) -> dict[str,
         }
 
     if account_type == "premium":
-        await db["KHACHHANG"].update_one({"_id": user_id}, {"$set": {"LoaiKH": "registered"}})
-        await db["TAIKHOAN"].update_one(
-            {"MaKH": user_id}, {"$set": {"Role": "registered", "UpdatedAt": now}}
+        await asyncio.gather(
+            db["KHACHHANG"].update_one(
+                {"_id": user_id}, {"$set": {"LoaiKH": "registered"}}
+            ),
+            db["TAIKHOAN"].update_one(
+                {"MaKH": user_id}, {"$set": {"Role": "registered", "UpdatedAt": now}}
+            ),
         )
 
     if not usage_doc or str(usage_doc.get("MaGoiDV") or "") != DEFAULT_FREE_PLAN_ID:
-        await db["LUOTDUNG"].update_one(
+        usage_doc = await db["LUOTDUNG"].find_one_and_update(
             {"MaKH": user_id, "MaGoiDV": DEFAULT_FREE_PLAN_ID},
             {
                 "$set": {
@@ -2044,9 +2227,10 @@ async def resolve_quota_state(db: Any, user_id: str, now: datetime) -> dict[str,
                     "_id": f"LD_{uuid4().hex[:10].upper()}",
                 },
             },
+            sort=[("NgayBatDau", -1)],
             upsert=True,
+            return_document=ReturnDocument.AFTER,
         )
-        usage_doc = await db["LUOTDUNG"].find_one({"MaKH": user_id, "MaGoiDV": DEFAULT_FREE_PLAN_ID})
 
     plan_id = usage_doc.get("MaGoiDV") or DEFAULT_FREE_PLAN_ID
     goidv_doc = await db["GOIDV"].find_one({"_id": plan_id})
@@ -2070,7 +2254,12 @@ async def resolve_quota_state(db: Any, user_id: str, now: datetime) -> dict[str,
     }
 
 
-async def ensure_analysis_quota_available(db: Any, user_id: str) -> dict[str, Any]:
+async def ensure_analysis_quota_available(
+    db: Any,
+    user_id: str,
+    *,
+    state: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Kiểm tra lượt phân tích còn lại; raise 403 ANALYSIS_QUOTA_EXCEEDED nếu đã hết.
 
     Dùng làm "cổng chặn" chung cho cả hai nơi:
@@ -2085,20 +2274,20 @@ async def ensure_analysis_quota_available(db: Any, user_id: str) -> dict[str, An
     """
     now = datetime.now(timezone.utc)
     try:
-        state = await resolve_quota_state(db, user_id, now)
+        state = state or await resolve_quota_state(db, user_id, now)
     except DATABASE_ERRORS:
         # Giữ hành vi cũ: không chặn nếu DB lỗi khi kiểm tra lượt.
-        return {"unlimited": True, "limit": None, "used": None}
+        return {"unlimited": True, "limit": None, "used": None, "state": state}
 
     if state["is_unlimited"]:
-        return {"unlimited": True, "limit": None, "used": None}
+        return {"unlimited": True, "limit": None, "used": None, "state": state}
 
     try:
         used = await db["LICHSUPTCV"].count_documents(
             {"MaKH": user_id, "NgayPT": {"$gte": state["period_start"]}}
         )
     except DATABASE_ERRORS:
-        return {"unlimited": False, "limit": state["limit"], "used": None}
+        return {"unlimited": False, "limit": state["limit"], "used": None, "state": state}
 
     if used >= state["limit"]:
         raise HTTPException(
@@ -2109,7 +2298,7 @@ async def ensure_analysis_quota_available(db: Any, user_id: str) -> dict[str, An
             },
         )
 
-    return {"unlimited": False, "limit": state["limit"], "used": used}
+    return {"unlimited": False, "limit": state["limit"], "used": used, "state": state}
 
 
 async def create_analysis_for_cv(
@@ -2119,6 +2308,7 @@ async def create_analysis_for_cv(
     role_id: str,
     user_id: str,
     current_plan: str | None = None,
+    quota_state: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     try:
         cv = await db["CV"].find_one({"_id": cv_id, "MaKH": user_id})
@@ -2139,7 +2329,9 @@ async def create_analysis_for_cv(
 
     role = await get_role_by_id(db, role_id)
     canonical_role_id = role["role_id"]
-    analysis = analyze_sections(cv=cv, role=role)
+    # GPT evaluation is currently synchronous; run it outside the event loop
+    # so concurrent MongoDB/API requests are not stalled by one analysis.
+    analysis = await asyncio.to_thread(analyze_sections, cv=cv, role=role)
     can_view_roadmap = can_view_premium_roadmap(current_plan)
     now = datetime.now(timezone.utc)
     analysis_id = f"KQ_{uuid4().hex[:10].upper()}"
@@ -2187,7 +2379,7 @@ async def create_analysis_for_cv(
     # Đây là lớp chặn thứ 2 (defense-in-depth): phòng trường hợp quota bị dùng
     # hết giữa lúc CV được tải lên và lúc người dùng bấm "Phân tích".
     # -----------------------------------------------------------
-    await ensure_analysis_quota_available(db, user_id)
+    await ensure_analysis_quota_available(db, user_id, state=quota_state)
 
     try:
         await db["CV"].update_one(
@@ -2431,7 +2623,18 @@ async def get_analysis_detail(
     cv_query: dict[str, Any] = {"_id": result.get("MaCV")}
     if not allow_admin:
         cv_query["MaKH"] = user_id
-    cv = await db["CV"].find_one(cv_query)
+    cv = await db["CV"].find_one(
+        cv_query,
+        {
+            "_id": 1,
+            "MaKH": 1,
+            "TenFileGoc": 1,
+            "Loai": 1,
+            "DungLuong": 1,
+            "MaNganh": 1,
+            "TrangThai": 1,
+        },
+    )
     if not cv:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -2442,7 +2645,11 @@ async def get_analysis_detail(
     role_id = result.get("MaNganh") or cv.get("MaNganh")
     if role_id:
         try:
-            role = await get_role_by_id(db, role_id)
+            role = await get_role_by_id(
+                db,
+                role_id,
+                include_skills=not isinstance(result.get("RoadmapRecommendation"), list),
+            )
         except HTTPException:
             role = None
 

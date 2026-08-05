@@ -2,7 +2,7 @@
 
 # Định nghĩa route cho phân tích, so sánh kỹ năng và kết quả.
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from app.db import db  # Import instance kết nối MongoDB
 from app.routes.dependencies import get_current_user
 from app.services.analysis_service import (
@@ -24,47 +24,58 @@ async def get_analysis_history(
 ):
     user_id = user["user_id"]
     
-    # Sử dụng Aggregation Pipeline của MongoDB để JOIN bảng KETQUA_PTCV và bảng CV
+    # Start from the per-user history ledger so MongoDB can use
+    # idx_lichsu_khachhang_ngay, then cap the working set before any lookup.
     pipeline = [
+        {"$match": {"MaKH": user_id, "MaKQ": {"$exists": True}}},
+        {"$sort": {"NgayPT": -1}},
+        {"$limit": limit},
+        {
+            "$lookup": {
+                "from": "KETQUA_PTCV",
+                "localField": "MaKQ",
+                "foreignField": "_id",
+                "as": "analysis_info"
+            }
+        },
+        {"$unwind": "$analysis_info"},
         {
             "$lookup": {
                 "from": "CV",
-                "localField": "MaCV",
+                "localField": "analysis_info.MaCV",
                 "foreignField": "_id",
                 "as": "cv_info"
             }
         },
-        # Chuyển mảng cv_info thành object
         {"$unwind": "$cv_info"},
-
+        {"$match": {"cv_info.MaKH": user_id}},
+        {
+            "$set": {
+                "resolved_role_id": {
+                    "$ifNull": ["$analysis_info.MaNganh", "$cv_info.MaNganh"]
+                }
+            }
+        },
         {
             "$lookup": {
                 "from": "NGANHNGHIET",
-                "localField": "MaNganh",
+                "localField": "resolved_role_id",
                 "foreignField": "_id",
                 "as": "role_info"
             }
         },
         {"$unwind": {"path": "$role_info", "preserveNullAndEmptyArrays": True}},
-        
-        # Chỉ lấy CV của user hiện tại đang đăng nhập
-        {"$match": {"cv_info.MaKH": user_id}},
-        
-        # Sắp xếp mới nhất lên đầu
-        {"$sort": {"ThoiDiemPT": -1}},
-        
-        # Format lại dữ liệu trả về cho Frontend
         {
             "$project": {
                 "_id": 0,
-                "analysis_id": "$_id",
+                "analysis_id": "$analysis_info._id",
                 "cv_id": "$cv_info._id",
                 "cv_name": "$cv_info.TenFileGoc",
-                "overall_score": "$DiemTongQuan",
-                "classification": "$XepLoai",
-                "role_id": {"$ifNull": ["$MaNganh", "$cv_info.MaNganh"]},
+                "overall_score": "$analysis_info.DiemTongQuan",
+                "classification": "$analysis_info.XepLoai",
+                "role_id": "$resolved_role_id",
                 "role_name": "$role_info.TenNganh",
-                "created_at": "$ThoiDiemPT",
+                "created_at": {"$ifNull": ["$analysis_info.ThoiDiemPT", "$NgayPT"]},
                 "status": "$cv_info.TrangThai"
             }
         }
@@ -72,9 +83,9 @@ async def get_analysis_history(
     
     # Thực thi truy vấn với AsyncIOMotorClient
     try:
-        cursor = db["KETQUA_PTCV"].aggregate(pipeline)
+        cursor = db["LICHSUPTCV"].aggregate(pipeline)
         # Lịch sử không phải quyền lợi Premium: trả toàn bộ cho mọi gói.
-        history_list = await cursor.to_list(length=None)
+        history_list = await cursor.to_list(length=limit)
     except DATABASE_ERRORS:
         return {
             "data": [],
@@ -93,7 +104,7 @@ async def get_analysis_history(
             item["created_at"] = item["created_at"].isoformat()
 
     if any(not item.get("role_name") and item.get("role_id") for item in history_list):
-        roles = await list_career_roles(db)
+        roles = await list_career_roles(db, include_skills=False)
         role_name_by_id = {role["role_id"]: role["name"] for role in roles}
         for item in history_list:
             if not item.get("role_name") and item.get("role_id"):
@@ -112,7 +123,11 @@ async def get_analysis_history(
     }
 
 @router.get("/{analysis_id}", summary="UC-015: Xem điểm tổng quan, điểm thành phần và lỗi cơ bản")
-async def get_analysis_result(analysis_id: str, user: dict = Depends(get_current_user)):
+async def get_analysis_result(
+    analysis_id: str,
+    background_tasks: BackgroundTasks,
+    user: dict = Depends(get_current_user),
+):
     from datetime import datetime, timezone
 
     effective_plan = user.get("current_plan")
@@ -136,7 +151,8 @@ async def get_analysis_result(analysis_id: str, user: dict = Depends(get_current
     # The result payload already contains the actionable suggestions shown by
     # AnalysisResultPage, so this is the real "view suggestions" funnel step.
     if user.get("role") != "admin":
-        await record_product_event_safely(
+        background_tasks.add_task(
+            record_product_event_safely,
             db,
             event_name="suggestions_viewed",
             user_id=user["user_id"],
@@ -146,7 +162,11 @@ async def get_analysis_result(analysis_id: str, user: dict = Depends(get_current
     return {"data": detail, "access_level": effective_plan, "error": None}
 
 @router.get("/{analysis_id}/suggestions", summary="UC-016: Xem gợi ý cải thiện CV")
-async def get_suggestions(analysis_id: str, user: dict = Depends(get_current_user)):
+async def get_suggestions(
+    analysis_id: str,
+    background_tasks: BackgroundTasks,
+    user: dict = Depends(get_current_user),
+):
     from datetime import datetime, timezone
 
     effective_plan = user.get("current_plan")
@@ -187,7 +207,8 @@ async def get_suggestions(analysis_id: str, user: dict = Depends(get_current_use
         formatted_suggestions.append(formatted_sug)
 
     if user.get("role") != "admin":
-        await record_product_event_safely(
+        background_tasks.add_task(
+            record_product_event_safely,
             db,
             event_name="suggestions_viewed",
             user_id=user["user_id"],

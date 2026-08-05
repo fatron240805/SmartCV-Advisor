@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import re
 import os
 from dataclasses import dataclass
@@ -599,7 +600,7 @@ def parse_sections(text: str) -> dict[str, str]:
     return sections
 
 
-async def build_cv_document(
+def _build_cv_document_sync(
     *,
     file: UploadFile,
     content: bytes,
@@ -666,6 +667,27 @@ async def build_cv_document(
             "section_parser_prompt_version": section_parser_prompt_version,
         },
     }
+
+
+async def build_cv_document(
+    *,
+    file: UploadFile,
+    content: bytes,
+    consent_accepted: bool,
+    user_id: str,
+    policy_version: str | None,
+) -> dict[str, Any]:
+    # PDF parsing, DOCX parsing, image rendering, and the current synchronous
+    # OpenAI client are blocking operations. Keep them off FastAPI's event loop
+    # so other API/data requests remain responsive during CV processing.
+    return await asyncio.to_thread(
+        _build_cv_document_sync,
+        file=file,
+        content=content,
+        consent_accepted=consent_accepted,
+        user_id=user_id,
+        policy_version=policy_version,
+    )
 
 
 def format_file_size(size_bytes: int) -> str:

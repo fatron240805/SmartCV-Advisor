@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
@@ -49,28 +50,65 @@ def public_deletion_request(item: dict[str, Any]) -> dict[str, Any]:
 
 async def get_profile(db: Any, user_id: str) -> dict[str, Any]:
     try:
-        customer = await db["KHACHHANG"].find_one({"_id": user_id})
+        customer, cvs, deletion_requests = await asyncio.gather(
+            db["KHACHHANG"].find_one(
+                {"_id": user_id},
+                {
+                    "_id": 1,
+                    "HoTen": 1,
+                    "Email": 1,
+                    "AvatarUrl": 1,
+                    "NNQuanTam": 1,
+                    "ViTriNN": 1,
+                    "TrinhDoHV": 1,
+                    "LoaiKH": 1,
+                    "TrangThai": 1,
+                    "NgayDangKy": 1,
+                    "NgayCapNhat": 1,
+                    "TrainingOptIn": 1,
+                },
+            ),
+            db["CV"].find(
+                {"MaKH": user_id},
+                {
+                    "_id": 1,
+                    "TenFileGoc": 1,
+                    "NgayTaiLen": 1,
+                    "MaNganh": 1,
+                    "ViTriMucTieu": 1,
+                    "TrangThai": 1,
+                },
+            ).sort("NgayTaiLen", -1).to_list(length=None),
+            db["DATA_DELETION_REQUESTS"].find(
+                {"MaKH": user_id},
+                {
+                    "_id": 1,
+                    "Scope": 1,
+                    "Reason": 1,
+                    "Status": 1,
+                    "RequestedAt": 1,
+                    "ResolvedAt": 1,
+                },
+            ).sort("RequestedAt", -1).limit(5).to_list(length=5),
+        )
         if not customer:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={"code": "USER_NOT_FOUND", "message": "Không tìm thấy hồ sơ người dùng."},
             )
 
-        # Return every CV owned by the user so the privacy screen can delete
-        # any uploaded file, not only the ten most recent ones.
-        cvs = await db["CV"].find({"MaKH": user_id}).sort("NgayTaiLen", -1).to_list(length=None)
         role_ids = sorted({cv.get("MaNganh") for cv in cvs if cv.get("MaNganh")})
-        roles = await db["NGANHNGHIET"].find({"_id": {"$in": role_ids}}).to_list(length=len(role_ids))
+        roles = (
+            await db["NGANHNGHIET"].find(
+                {"_id": {"$in": role_ids}},
+                {"_id": 1, "TenNganh": 1},
+            ).to_list(length=len(role_ids))
+            if role_ids
+            else []
+        )
         role_name_by_id = {role["_id"]: role.get("TenNganh") for role in roles}
         for cv in cvs:
             cv["TenNganh"] = role_name_by_id.get(cv.get("MaNganh"))
-        deletion_requests = (
-            await db["DATA_DELETION_REQUESTS"]
-            .find({"MaKH": user_id})
-            .sort("RequestedAt", -1)
-            .limit(5)
-            .to_list(length=5)
-        )
     except HTTPException:
         raise
     except DATABASE_ERRORS as exc:

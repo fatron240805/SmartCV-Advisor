@@ -1,2 +1,0 @@
-# Install backend Python dependencies from the project root.
--r backend/requirements.txt

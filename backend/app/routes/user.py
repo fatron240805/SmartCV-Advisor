@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from fastapi import APIRouter, Depends
@@ -104,17 +105,18 @@ async def get_my_quota(user: dict[str, str] = Depends(get_current_user)) -> dict
         is_unlimited = state["is_unlimited"]
         period_start = state["period_start"]
 
-        # Đếm TỔNG số lần phân tích để HIỂN THỊ (không lọc ngày)
-        used = await db["LICHSUPTCV"].count_documents({"MaKH": user_id})
-
         # Tính số lượt còn lại theo chu kỳ hiện tại (có lọc theo period_start)
         if not is_unlimited:
-            used_in_period = await db["LICHSUPTCV"].count_documents({
-                "MaKH": user_id,
-                "NgayPT": {"$gte": period_start}
-            })
+            used, used_in_period = await asyncio.gather(
+                db["LICHSUPTCV"].count_documents({"MaKH": user_id}),
+                db["LICHSUPTCV"].count_documents({
+                    "MaKH": user_id,
+                    "NgayPT": {"$gte": period_start}
+                }),
+            )
             remaining = max(0, limit - used_in_period)
         else:
+            used = await db["LICHSUPTCV"].count_documents({"MaKH": user_id})
             remaining = None
 
         label = "Không giới hạn" if is_unlimited else f"{remaining}/{limit} lượt còn lại"

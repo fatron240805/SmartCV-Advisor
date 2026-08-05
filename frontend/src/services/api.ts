@@ -217,6 +217,21 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
+const inFlightReads = new Map<string, Promise<unknown>>();
+
+function dedupeRead<T>(key: string, loader: () => Promise<T>): Promise<T> {
+  const accountKey = getStoredAuthSession()?.user.account_id ?? 'anonymous';
+  const scopedKey = `${accountKey}:${key}`;
+  const existing = inFlightReads.get(scopedKey) as Promise<T> | undefined;
+  if (existing) return existing;
+
+  const request = loader().finally(() => {
+    inFlightReads.delete(scopedKey);
+  });
+  inFlightReads.set(scopedKey, request);
+  return request;
+}
+
 export const apiService = {
   register: async (payload: {
     fullName: string;
@@ -292,8 +307,10 @@ export const apiService = {
   },
 
   getProfile: async (): Promise<{ data: UserProfile }> => {
-    const response = await apiClient.get('/users/me');
-    return response.data;
+    return dedupeRead('profile', async () => {
+      const response = await apiClient.get('/users/me');
+      return response.data;
+    });
   },
 
   getQuota: async (): Promise<{
@@ -309,8 +326,10 @@ export const apiService = {
       expires_at: string | null;
     };
   }> => {
-    const response = await apiClient.get('/users/me/quota');
-    return response.data;
+    return dedupeRead('quota', async () => {
+      const response = await apiClient.get('/users/me/quota');
+      return response.data;
+    });
   },
 
   updateProfile: async (payload: {
@@ -344,8 +363,10 @@ export const apiService = {
   },
 
   getCareerRoles: async (): Promise<{ data: CareerRole[] }> => {
-    const response = await apiClient.get('/career-roles');
-    return response.data;
+    return dedupeRead('career-roles', async () => {
+      const response = await apiClient.get('/career-roles');
+      return response.data;
+    });
   },
 
   uploadCv: async (payload: {
@@ -392,13 +413,17 @@ export const apiService = {
   },
 
   getAnalysisResult: async (analysisId: string): Promise<{ data: AnalysisResult; access_level: string }> => {
-    const response = await apiClient.get(`/analyses/${analysisId}`);
-    return response.data;
+    return dedupeRead(`analysis:${analysisId}`, async () => {
+      const response = await apiClient.get(`/analyses/${analysisId}`);
+      return response.data;
+    });
   },
 
   getHistory: async (limit: number = 10) => {
-    const response = await apiClient.get(`/analyses?limit=${limit}`);
-    return response.data;
+    return dedupeRead(`history:${limit}`, async () => {
+      const response = await apiClient.get(`/analyses?limit=${limit}`);
+      return response.data;
+    });
   },
 
   getSuggestions: async (analysisId: string) => {
@@ -407,8 +432,10 @@ export const apiService = {
   },
 
   getPlans: async (): Promise<{ data: ServicePlan[] }> => {
-    const response = await apiClient.get('/service-plans');
-    return response.data;
+    return dedupeRead('plans', async () => {
+      const response = await apiClient.get('/service-plans');
+      return response.data;
+    });
   },
 
   getAdminCareerRoles: async (params?: {
@@ -548,8 +575,10 @@ export const apiService = {
   },
 
   getFeedbackEligibility: async (analysisId: string): Promise<{ data: FeedbackEligibility }> => {
-    const response = await apiClient.get('/feedback/eligibility', { params: { analysis_id: analysisId } });
-    return response.data;
+    return dedupeRead(`feedback-eligibility:${analysisId}`, async () => {
+      const response = await apiClient.get('/feedback/eligibility', { params: { analysis_id: analysisId } });
+      return response.data;
+    });
   },
 
   getAdminFeedback: async (params?: AdminFeedbackFilters): Promise<{

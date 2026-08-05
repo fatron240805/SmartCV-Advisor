@@ -2,17 +2,19 @@
 
 from __future__ import annotations
 
+import asyncio
 import re
 from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
 from fastapi import HTTPException, status
-from pymongo import ASCENDING
-from pymongo.errors import ConfigurationError, OperationFailure, PyMongoError, ServerSelectionTimeoutError
+from pymongo import UpdateOne
+from pymongo.errors import BulkWriteError, ConfigurationError, PyMongoError, ServerSelectionTimeoutError
 
 from app.services.analysis_service import DEFAULT_ROLES, ROLE_ICON_LABELS
 from app.services.cv_service import normalize_search_text
+from app.services.database_bootstrap import ensure_mvp_collections
 
 
 DATABASE_ERRORS = (ConfigurationError, PyMongoError, ServerSelectionTimeoutError)
@@ -148,40 +150,9 @@ def parse_positive_number(value: Any, *, field: str, max_value: float = 100.0) -
 
 
 async def ensure_admin_indexes(db: Any) -> None:
-    try:
-        await db["NGANHNGHIET"].create_index(
-            [("TenNganhNormalized", ASCENDING)],
-            unique=True,
-            sparse=True,
-            name="uq_nganh_ten_normalized",
-        )
-        await db["KYNANG"].create_index(
-            [("TenKyNangNormalized", ASCENDING)],
-            unique=True,
-            sparse=True,
-            name="uq_kynang_ten_normalized",
-        )
-        await db["NGANHNGHE_KYNANG"].create_index(
-            [("MaNganh", ASCENDING), ("MaKyNang", ASCENDING)],
-            unique=True,
-            name="uq_nganhnghe_kynang",
-        )
-
-        diem_indexes = await db["DIEMDANHGIA"].list_indexes().to_list(length=50)
-        if any(index.get("name") == "uq_diemdanhgia_makynang" for index in diem_indexes):
-            await db["DIEMDANHGIA"].drop_index("uq_diemdanhgia_makynang")
-        await db["DIEMDANHGIA"].create_index(
-            [("MaNganh", ASCENDING), ("MaKyNang", ASCENDING)],
-            unique=True,
-            sparse=True,
-            name="uq_diemdanhgia_manganh_makynang",
-        )
-        await db["SCORING_CONFIG_VERSIONS"].create_index(
-            [("MaNganh", ASCENDING), ("CreatedAt", ASCENDING)],
-            name="idx_scoring_config_role_time",
-        )
-    except OperationFailure:
-        return
+    # Startup installs these indexes once. This cached fallback is retained for
+    # service usage outside the FastAPI lifespan (scripts/tests/workers).
+    await ensure_mvp_collections(db)
 
 
 def database_unavailable(message: str, exc: Exception) -> HTTPException:
@@ -240,13 +211,36 @@ def public_role(document: dict[str, Any], *, skill_count: int = 0, analysis_coun
 
 
 async def count_role_usage(db: Any, role_id: str) -> int:
-    cv_count = await db["CV"].count_documents({"MaNganh": role_id})
-    result_count = await db["KETQUA_PTCV"].count_documents({"MaNganh": role_id})
+    cv_count, result_count = await asyncio.gather(
+        db["CV"].count_documents({"MaNganh": role_id}),
+        db["KETQUA_PTCV"].count_documents({"MaNganh": role_id}),
+    )
     return cv_count + result_count
 
 
 async def count_role_skills(db: Any, role_id: str) -> int:
     return await db["NGANHNGHE_KYNANG"].count_documents({"MaNganh": role_id, "TrangThai": {"$ne": "inactive"}})
+
+
+async def grouped_role_counts(
+    db: Any,
+    collection_name: str,
+    role_ids: list[str],
+    *,
+    extra_match: dict[str, Any] | None = None,
+) -> dict[str, int]:
+    if not role_ids:
+        return {}
+    match: dict[str, Any] = {"MaNganh": {"$in": role_ids}}
+    if extra_match:
+        match.update(extra_match)
+    rows = await db[collection_name].aggregate(
+        [
+            {"$match": match},
+            {"$group": {"_id": "$MaNganh", "count": {"$sum": 1}}},
+        ]
+    ).to_list(length=len(role_ids))
+    return {str(row["_id"]): int(row.get("count", 0)) for row in rows if row.get("_id")}
 
 
 async def materialize_default_role(db: Any, role_id: str) -> dict[str, Any]:
@@ -314,7 +308,7 @@ async def list_admin_roles(db: Any, *, search: str = "", status_filter: str = "a
             by_id[document["_id"]] = document
 
         normalized_search = normalized_unique(search)
-        roles: list[dict[str, Any]] = []
+        filtered_documents: list[dict[str, Any]] = []
         for document in by_id.values():
             role_status = public_role_status(document.get("TrangThai"))
             text = normalized_unique(f"{document.get('TenNganh', '')} {document.get('MoTa', '')}")
@@ -322,12 +316,27 @@ async def list_admin_roles(db: Any, *, search: str = "", status_filter: str = "a
                 continue
             if status_filter in {"active", "inactive"} and role_status != status_filter:
                 continue
-            role_id = document["_id"]
+            filtered_documents.append(document)
+
+        role_ids = [str(document["_id"]) for document in filtered_documents]
+        skill_counts, cv_counts, result_counts = await asyncio.gather(
+            grouped_role_counts(
+                db,
+                "NGANHNGHE_KYNANG",
+                role_ids,
+                extra_match={"TrangThai": {"$ne": "inactive"}},
+            ),
+            grouped_role_counts(db, "CV", role_ids),
+            grouped_role_counts(db, "KETQUA_PTCV", role_ids),
+        )
+        roles: list[dict[str, Any]] = []
+        for document in filtered_documents:
+            role_id = str(document["_id"])
             roles.append(
                 public_role(
                     document,
-                    skill_count=await count_role_skills(db, role_id),
-                    analysis_count=await count_role_usage(db, role_id),
+                    skill_count=skill_counts.get(role_id, 0),
+                    analysis_count=cv_counts.get(role_id, 0) + result_counts.get(role_id, 0),
                 )
             )
     except HTTPException:
@@ -510,7 +519,10 @@ async def ensure_default_skill_configs(db: Any, role_id: str) -> None:
     role = default_role_by_id(role_id)
     if not role:
         return
-    await materialize_default_role(db, role_id)
+    role_document = await materialize_default_role(db, role_id)
+    if int(role_document.get("DefaultSkillConfigVersion", 0) or 0) >= 1:
+        return
+
     total_importance = sum(max(1, int(item.get("importance", 0))) for item in role["skills"]) or 1
     default_weights: list[float] = []
     running_weight = 0.0
@@ -523,47 +535,137 @@ async def ensure_default_skill_configs(db: Any, role_id: str) -> None:
             running_weight += weight
         default_weights.append(weight)
 
+    skill_documents = await db["KYNANG"].find(
+        {},
+        {
+            "_id": 1,
+            "TenKyNang": 1,
+            "TenKyNangNormalized": 1,
+            "NhomKyNang": 1,
+        },
+    ).to_list(length=2000)
+    skill_by_name = {
+        normalized_unique(
+            str(document.get("TenKyNangNormalized") or document.get("TenKyNang") or "")
+        ): document
+        for document in skill_documents
+        if document.get("_id") and (document.get("TenKyNangNormalized") or document.get("TenKyNang"))
+    }
+
+    configured_skills: list[tuple[dict[str, Any], dict[str, Any], float]] = []
     for index, item in enumerate(role["skills"]):
-        skill = await ensure_skill_document(
-            db,
-            skill_name=item["skill"],
-            group=item.get("group", ""),
-        )
-        relation_id = f"NNKN_{role_id}_{skill['_id']}"
-        await db["NGANHNGHE_KYNANG"].update_one(
-            {"MaNganh": role_id, "MaKyNang": skill["_id"]},
+        normalized_name = normalized_unique(item["skill"])
+        skill = skill_by_name.get(normalized_name)
+        if not skill:
+            # Missing skill documents are a one-time migration path. Normal
+            # reads use the bulk maps above and never enter this branch.
+            skill = await ensure_skill_document(
+                db,
+                skill_name=item["skill"],
+                group=item.get("group", ""),
+            )
+            skill_by_name[normalized_name] = skill
+        configured_skills.append((item, skill, default_weights[index]))
+
+    skill_ids = [str(skill["_id"]) for _, skill, _ in configured_skills]
+    existing_relations, existing_scores = await asyncio.gather(
+        db["NGANHNGHE_KYNANG"].find(
+            {"MaNganh": role_id, "MaKyNang": {"$in": skill_ids}}
+        ).to_list(length=len(skill_ids)),
+        db["DIEMDANHGIA"].find(
             {
-                "$setOnInsert": {
-                    "_id": relation_id[:96],
-                    "MaNganh": role_id,
-                    "MaKyNang": skill["_id"],
-                    "TrangThai": "active",
-                    "NgayTao": utc_now(),
-                    "NgayCapNhat": utc_now(),
-                }
-            },
-            upsert=True,
-        )
-        existing_score = await db["DIEMDANHGIA"].find_one({"MaNganh": role_id, "MaKyNang": skill["_id"]})
-        if not existing_score:
-            legacy_score = await db["DIEMDANHGIA"].find_one({"MaKyNang": skill["_id"], "MaNganh": {"$exists": False}})
-            importance = parse_importance(item.get("importance", 0))
-            weight = default_weights[index]
-            payload = {
-                "MaNganh": role_id,
-                "MaKyNang": skill["_id"],
-                "Diem": legacy_score.get("Diem", default_required_score(importance)) if legacy_score else default_required_score(importance),
-                "TrongSo": legacy_score.get("TrongSo", weight) if legacy_score else weight,
-                "MucDo": legacy_score.get("MucDo", importance_to_label(importance)) if legacy_score else importance_to_label(importance),
-                "MucDoQuanTrong": importance,
-                "MoTaTieuChi": legacy_score.get("MoTaTieuChi", "") if legacy_score else "",
-                "TrangThai": "active",
-                "NgayCapNhat": utc_now(),
+                "MaKyNang": {"$in": skill_ids},
+                "$or": [
+                    {"MaNganh": role_id},
+                    {"MaNganh": {"$exists": False}},
+                ],
             }
-            if legacy_score:
-                await db["DIEMDANHGIA"].update_one({"_id": legacy_score["_id"]}, {"$set": payload})
-            else:
-                await db["DIEMDANHGIA"].insert_one({"_id": f"DDG_{uuid4().hex[:12].upper()}", **payload})
+        ).to_list(length=max(len(skill_ids) * 2, 1)),
+    )
+    relation_keys = {
+        (str(relation.get("MaNganh")), str(relation.get("MaKyNang")))
+        for relation in existing_relations
+    }
+    role_score_by_skill = {
+        str(score.get("MaKyNang")): score
+        for score in existing_scores
+        if score.get("MaNganh") == role_id
+    }
+    legacy_score_by_skill = {
+        str(score.get("MaKyNang")): score
+        for score in existing_scores
+        if not score.get("MaNganh")
+    }
+
+    now = utc_now()
+    relation_operations: list[UpdateOne] = []
+    score_operations: list[UpdateOne] = []
+    for item, skill, weight in configured_skills:
+        skill_id = str(skill["_id"])
+        relation_id = f"NNKN_{role_id}_{skill['_id']}"
+        if (role_id, skill_id) not in relation_keys:
+            relation_operations.append(
+                UpdateOne(
+                    {"MaNganh": role_id, "MaKyNang": skill["_id"]},
+                    {
+                        "$setOnInsert": {
+                            "_id": relation_id[:96],
+                            "MaNganh": role_id,
+                            "MaKyNang": skill["_id"],
+                            "TrangThai": "active",
+                            "NgayTao": now,
+                            "NgayCapNhat": now,
+                        }
+                    },
+                    upsert=True,
+                )
+            )
+
+        if skill_id in role_score_by_skill:
+            continue
+        legacy_score = legacy_score_by_skill.get(skill_id) or {}
+        importance = parse_importance(item.get("importance", 0))
+        score_operations.append(
+            UpdateOne(
+                {"MaNganh": role_id, "MaKyNang": skill["_id"]},
+                {
+                    "$setOnInsert": {
+                        "_id": f"DDG_{uuid4().hex[:12].upper()}",
+                        "MaNganh": role_id,
+                        "MaKyNang": skill["_id"],
+                        "Diem": legacy_score.get("Diem", default_required_score(importance)),
+                        "TrongSo": legacy_score.get("TrongSo", weight),
+                        "MucDo": legacy_score.get("MucDo", importance_to_label(importance)),
+                        "MucDoQuanTrong": importance,
+                        "MoTaTieuChi": legacy_score.get("MoTaTieuChi", ""),
+                        "TrangThai": "active",
+                        "NgayCapNhat": now,
+                    }
+                },
+                upsert=True,
+            )
+        )
+
+    writes = []
+    if relation_operations:
+        writes.append(db["NGANHNGHE_KYNANG"].bulk_write(relation_operations, ordered=False))
+    if score_operations:
+        writes.append(db["DIEMDANHGIA"].bulk_write(score_operations, ordered=False))
+    if writes:
+        try:
+            await asyncio.gather(*writes)
+        except BulkWriteError as exc:
+            # Concurrent first reads can race while materializing the same
+            # defaults. Unique-index duplicate errors mean the other request
+            # completed the idempotent upsert; all other errors remain fatal.
+            errors = (exc.details or {}).get("writeErrors", [])
+            if not errors or any(error.get("code") != 11000 for error in errors):
+                raise
+
+    await db["NGANHNGHIET"].update_one(
+        {"_id": role_id},
+        {"$set": {"DefaultSkillConfigVersion": 1}},
+    )
 
 
 def public_skill_config(relation: dict[str, Any], skill: dict[str, Any], score: dict[str, Any]) -> dict[str, Any]:
@@ -593,14 +695,44 @@ async def list_role_skill_configs(db: Any, role_id: str) -> dict[str, Any]:
         await ensure_default_skill_configs(db, role_id)
         role = await materialize_default_role(db, role_id)
         relations = await db["NGANHNGHE_KYNANG"].find({"MaNganh": role_id}).to_list(length=300)
+        skill_ids = sorted(
+            {str(relation.get("MaKyNang")) for relation in relations if relation.get("MaKyNang")}
+        )
+        skill_documents: list[dict[str, Any]] = []
+        score_documents: list[dict[str, Any]] = []
+        if skill_ids:
+            skill_documents, score_documents = await asyncio.gather(
+                db["KYNANG"].find({"_id": {"$in": skill_ids}}).to_list(length=len(skill_ids)),
+                db["DIEMDANHGIA"].find(
+                    {
+                        "MaKyNang": {"$in": skill_ids},
+                        "$or": [
+                            {"MaNganh": role_id},
+                            {"MaNganh": {"$exists": False}},
+                        ],
+                    }
+                ).to_list(length=max(len(skill_ids) * 2, 1)),
+            )
+        skill_by_id = {
+            str(skill.get("_id")): skill for skill in skill_documents if skill.get("_id")
+        }
+        role_score_by_skill = {
+            str(score.get("MaKyNang")): score
+            for score in score_documents
+            if score.get("MaNganh") == role_id
+        }
+        legacy_score_by_skill = {
+            str(score.get("MaKyNang")): score
+            for score in score_documents
+            if not score.get("MaNganh")
+        }
         items: list[dict[str, Any]] = []
         for relation in relations:
-            skill = await db["KYNANG"].find_one({"_id": relation["MaKyNang"]})
+            skill_id = str(relation.get("MaKyNang") or "")
+            skill = skill_by_id.get(skill_id)
             if not skill:
                 continue
-            score = await db["DIEMDANHGIA"].find_one({"MaNganh": role_id, "MaKyNang": skill["_id"]})
-            if not score:
-                score = await db["DIEMDANHGIA"].find_one({"MaKyNang": skill["_id"], "MaNganh": {"$exists": False}})
+            score = role_score_by_skill.get(skill_id) or legacy_score_by_skill.get(skill_id)
             if not score:
                 continue
             items.append(public_skill_config(relation, skill, score))
@@ -933,13 +1065,13 @@ async def bulk_update_role_skill_configs(
     return {"items": updated_items, "scoring_config_version": version}
 
 
-async def public_admin_user(db: Any, account: dict[str, Any]) -> dict[str, Any]:
+def build_public_admin_user(
+    account: dict[str, Any],
+    profile: dict[str, Any] | None,
+    *,
+    analysis_count: int = 0,
+) -> dict[str, Any]:
     role = account.get("Role") or ("admin" if account.get("MaADM") else "registered")
-    profile = None
-    if account.get("MaKH"):
-        profile = await db["KHACHHANG"].find_one({"_id": account["MaKH"]})
-    elif account.get("MaADM"):
-        profile = await db["ADMIN"].find_one({"_id": account["MaADM"]})
     profile = profile or {}
     user_id = account.get("MaKH") or account.get("MaADM")
     account_type = "admin" if role == "admin" else str(profile.get("LoaiKH", role)).lower()
@@ -958,10 +1090,42 @@ async def public_admin_user(db: Any, account: dict[str, Any]) -> dict[str, Any]:
         "industry_interest": profile.get("NNQuanTam", ""),
         "target_role": profile.get("ViTriNN", ""),
         "current_level": profile.get("TrinhDoHV", ""),
-        "analysis_count": await db["LICHSUPTCV"].count_documents({"MaKH": user_id}) if account.get("MaKH") else 0,
+        "analysis_count": analysis_count if account.get("MaKH") else 0,
         "lock_reason": account.get("LockReason"),
         "locked_at": as_iso(account.get("LockedAt")),
     }
+
+
+async def public_admin_user(db: Any, account: dict[str, Any]) -> dict[str, Any]:
+    user_id = account.get("MaKH") or account.get("MaADM")
+    if account.get("MaKH"):
+        profile, analysis_count = await asyncio.gather(
+            db["KHACHHANG"].find_one(
+                {"_id": account["MaKH"]},
+                {
+                    "_id": 1,
+                    "HoTen": 1,
+                    "Email": 1,
+                    "SoDienThoai": 1,
+                    "DiaChi": 1,
+                    "LoaiKH": 1,
+                    "TrangThai": 1,
+                    "NgayDangKy": 1,
+                    "LanDangNhapCuoi": 1,
+                    "NNQuanTam": 1,
+                    "ViTriNN": 1,
+                    "TrinhDoHV": 1,
+                },
+            ),
+            db["LICHSUPTCV"].count_documents({"MaKH": user_id}),
+        )
+        return build_public_admin_user(account, profile, analysis_count=int(analysis_count))
+
+    profile = await db["ADMIN"].find_one(
+        {"_id": account.get("MaADM")},
+        {"_id": 1, "HoTen": 1, "Email": 1},
+    )
+    return build_public_admin_user(account, profile)
 
 
 async def list_admin_users(
@@ -980,11 +1144,76 @@ async def list_admin_users(
     normalized_date_from = as_utc_datetime(date_from)
     normalized_date_to = as_utc_datetime(date_to)
     try:
-        accounts = await db["TAIKHOAN"].find({}).sort("CreatedAt", -1).to_list(length=1000)
+        accounts = await db["TAIKHOAN"].find(
+            {},
+            {
+                "_id": 1,
+                "MaKH": 1,
+                "MaADM": 1,
+                "Role": 1,
+                "Email": 1,
+                "HoTen": 1,
+                "TrangThai": 1,
+                "CreatedAt": 1,
+                "LastLoginAt": 1,
+                "LockReason": 1,
+                "LockedAt": 1,
+            },
+        ).sort("CreatedAt", -1).to_list(length=1000)
+        customer_ids = sorted({str(account["MaKH"]) for account in accounts if account.get("MaKH")})
+        admin_ids = sorted({str(account["MaADM"]) for account in accounts if account.get("MaADM")})
+
+        customer_query = db["KHACHHANG"].find(
+            {"_id": {"$in": customer_ids}},
+            {
+                "_id": 1,
+                "HoTen": 1,
+                "Email": 1,
+                "SoDienThoai": 1,
+                "DiaChi": 1,
+                "LoaiKH": 1,
+                "TrangThai": 1,
+                "NgayDangKy": 1,
+                "LanDangNhapCuoi": 1,
+                "NNQuanTam": 1,
+                "ViTriNN": 1,
+                "TrinhDoHV": 1,
+            },
+        ).to_list(length=len(customer_ids)) if customer_ids else asyncio.sleep(0, result=[])
+        admin_query = db["ADMIN"].find(
+            {"_id": {"$in": admin_ids}},
+            {"_id": 1, "HoTen": 1, "Email": 1},
+        ).to_list(length=len(admin_ids)) if admin_ids else asyncio.sleep(0, result=[])
+        analysis_query = db["LICHSUPTCV"].aggregate(
+            [
+                {"$match": {"MaKH": {"$in": customer_ids}}},
+                {"$group": {"_id": "$MaKH", "count": {"$sum": 1}}},
+            ]
+        ).to_list(length=len(customer_ids)) if customer_ids else asyncio.sleep(0, result=[])
+        customer_documents, admin_documents, analysis_rows = await asyncio.gather(
+            customer_query,
+            admin_query,
+            analysis_query,
+        )
+        profile_by_id = {
+            str(document["_id"]): document
+            for document in [*customer_documents, *admin_documents]
+            if document.get("_id")
+        }
+        analysis_count_by_user = {
+            str(row["_id"]): int(row.get("count", 0))
+            for row in analysis_rows
+            if row.get("_id")
+        }
         normalized_search = normalized_unique(search)
         items: list[dict[str, Any]] = []
         for account in accounts:
-            item = await public_admin_user(db, account)
+            user_id = str(account.get("MaKH") or account.get("MaADM") or "")
+            item = build_public_admin_user(
+                account,
+                profile_by_id.get(user_id),
+                analysis_count=analysis_count_by_user.get(user_id, 0),
+            )
             searchable = normalized_unique(f"{item['full_name']} {item['email']}")
             if normalized_search and normalized_search not in searchable:
                 continue
@@ -1030,7 +1259,16 @@ async def get_admin_user_detail(db: Any, user_id: str) -> dict[str, Any]:
         account = await get_account_by_user_id(db, user_id)
         detail = await public_admin_user(db, account)
         if account.get("MaKH"):
-            recent_cvs = await db["CV"].find({"MaKH": user_id}).sort("NgayTaiLen", -1).limit(5).to_list(length=5)
+            recent_cvs = await db["CV"].find(
+                {"MaKH": user_id},
+                {
+                    "_id": 1,
+                    "TenFileGoc": 1,
+                    "TrangThai": 1,
+                    "MaNganh": 1,
+                    "NgayTaiLen": 1,
+                },
+            ).sort("NgayTaiLen", -1).limit(5).to_list(length=5)
             detail["recent_cvs"] = [
                 {
                     "cv_id": cv["_id"],

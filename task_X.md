@@ -86,3 +86,4 @@ BƯỚC 6: CHỈNH SỬA CÁI LOGIC ĐANG BỊ SAI
 - nên tăng thời gian phiên đăng nhập của user, admin lên 1 ngày
 - cho phép user xóa CV của họ không cần phải yêu câù admin duyệt
 - amdin không được có chức năng chỉnh sửa thông tin của user
+- kiểm tra toàn bộ code bên admin, tôi thấy hiện tại nó đang lỗi 1 số chỗ

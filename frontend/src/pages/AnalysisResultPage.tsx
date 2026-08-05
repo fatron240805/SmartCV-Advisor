@@ -924,46 +924,62 @@ export default function AnalysisResultPage() {
   const [feedbackForm, setFeedbackForm] = useState(createInitialFeedbackForm);
 
   useEffect(() => {
-    const fetchResult = async () => {
-      if (!id) return;
+    if (!id) return undefined;
+    let active = true;
+    queueMicrotask(() => {
+      if (!active) return;
       setLoading(true);
       setErrorMessage('');
       setFeedbackMessage('');
       setFeedbackEligibility(null);
       setHasSubmittedFeedback(false);
       setFeedbackForm(createInitialFeedbackForm());
-      try {
-        const response = await apiService.getAnalysisResult(id);
+      if (isAdminViewer) {
+        setFeedbackOpen(false);
+        setFeedbackEligibilityLoading(false);
+      } else {
+        setFeedbackEligibilityLoading(true);
+      }
+    });
+
+    void apiService.getAnalysisResult(id)
+      .then((response) => {
+        if (!active) return;
         setResult(response.data);
         setSelectedSectionName(response.data.section_scores[0]?.section ?? null);
-        if (isAdminViewer) {
-          setFeedbackOpen(false);
-          setFeedbackEligibilityLoading(false);
-        } else {
-          setFeedbackEligibilityLoading(true);
-          try {
-            const eligibilityResponse = await apiService.getFeedbackEligibility(id);
-            setFeedbackEligibility(eligibilityResponse.data);
-            setFeedbackOpen(eligibilityResponse.data.can_submit);
-          } catch (eligibilityError) {
-            setFeedbackEligibility({
-              can_submit: false,
-              reason: getApiErrorMessage(eligibilityError),
-              existing_feedback_id: null,
-            });
-            setFeedbackOpen(false);
-          } finally {
-            setFeedbackEligibilityLoading(false);
-          }
-        }
-      } catch (error) {
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
         setErrorMessage(getApiErrorMessage(error));
-        setFeedbackEligibilityLoading(false);
-      } finally {
-        setLoading(false);
-      }
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    if (!isAdminViewer) {
+      void apiService.getFeedbackEligibility(id)
+        .then((eligibilityResponse) => {
+          if (!active) return;
+          setFeedbackEligibility(eligibilityResponse.data);
+          setFeedbackOpen(eligibilityResponse.data.can_submit);
+        })
+        .catch((eligibilityError: unknown) => {
+          if (!active) return;
+          setFeedbackEligibility({
+            can_submit: false,
+            reason: getApiErrorMessage(eligibilityError),
+            existing_feedback_id: null,
+          });
+          setFeedbackOpen(false);
+        })
+        .finally(() => {
+          if (active) setFeedbackEligibilityLoading(false);
+        });
+    }
+
+    return () => {
+      active = false;
     };
-    fetchResult();
   }, [id, isAdminViewer]);
 
   const visibleIssues = useMemo(() => {

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import hashlib
 import hmac
@@ -256,14 +257,28 @@ def public_user(customer: dict[str, Any] | None, account: dict[str, Any]) -> dic
 
 
 async def find_account_by_email(db: Any, email: str) -> dict[str, Any] | None:
-    return await db["TAIKHOAN"].find_one(account_query_by_email(email))
+    normalized = normalize_email(email)
+    account = await db["TAIKHOAN"].find_one({"EmailNormalized": normalized})
+    if account:
+        return account
+    # Compatibility path for old rows that predate EmailNormalized. Keeping
+    # the regex out of an $or lets normal sign-ins use the exact-match index.
+    return await db["TAIKHOAN"].find_one(
+        {"Email": {"$regex": f"^{re.escape(normalized)}$", "$options": "i"}}
+    )
 
 
 async def find_customer_for_account(db: Any, account: dict[str, Any]) -> dict[str, Any] | None:
     if account.get("MaKH"):
-        return await db["KHACHHANG"].find_one({"_id": account["MaKH"]})
+        return await db["KHACHHANG"].find_one(
+            {"_id": account["MaKH"]},
+            {"_id": 1, "HoTen": 1, "Email": 1, "LoaiKH": 1},
+        )
     if account.get("MaADM"):
-        return await db["ADMIN"].find_one({"_id": account["MaADM"]})
+        return await db["ADMIN"].find_one(
+            {"_id": account["MaADM"]},
+            {"_id": 1, "HoTen": 1, "Email": 1},
+        )
     return None
 
 
@@ -409,6 +424,7 @@ async def register_user(
         account_id = f"TK_{customer_id}"
         verification_token = secrets.token_urlsafe(48)
         verification_expires_at = now + timedelta(minutes=EMAIL_VERIFICATION_TOKEN_MINUTES)
+        password_hash = await asyncio.to_thread(hash_password, password)
 
         customer = {
             "_id": customer_id,
@@ -428,7 +444,7 @@ async def register_user(
             "_id": account_id,
             "Email": normalized_email,
             "EmailNormalized": normalized_email,
-            "MatKhauHash": hash_password(password),
+            "MatKhauHash": password_hash,
             "MaKH": customer_id,
             "Role": "registered",
             "TrangThai": "pending_verification",
@@ -694,7 +710,7 @@ async def login_user(db: Any, *, email: str, password: str, remember_me: bool) -
 
         ensure_account_can_login(account)
         stored_hash = account.get("MatKhauHash") or account.get("Matkhau")
-        if not verify_password(password, stored_hash):
+        if not await asyncio.to_thread(verify_password, password, stored_hash):
             failed_count = int(account.get("FailedLoginCount", 0) or 0) + 1
             updates: dict[str, Any] = {"FailedLoginCount": failed_count, "UpdatedAt": utc_now()}
             if failed_count >= MAX_FAILED_LOGIN_ATTEMPTS:
@@ -886,10 +902,11 @@ async def reset_password(
                 detail={"code": "AUTH_RESET_EXPIRED", "message": "Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn."},
             )
 
+        password_hash = await asyncio.to_thread(hash_password, password)
         reset_result = await db["TAIKHOAN"].update_one(
             {"_id": account["_id"], "PasswordResetTokenHash": reset_token_hash},
             {
-                "$set": {"MatKhauHash": hash_password(password), "FailedLoginCount": 0, "LockedUntil": None, "UpdatedAt": utc_now()},
+                "$set": {"MatKhauHash": password_hash, "FailedLoginCount": 0, "LockedUntil": None, "UpdatedAt": utc_now()},
                 "$unset": {"PasswordResetTokenHash": "", "PasswordResetExpiresAt": ""},
                 "$inc": {"AuthVersion": 1},
             },

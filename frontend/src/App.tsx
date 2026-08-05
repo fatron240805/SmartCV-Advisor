@@ -1,29 +1,30 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate, Link } from 'react-router-dom';
-import AdminAnalyticsPage from './pages/AdminAnalyticsPage';
-import AdminCareerRolesPage from './pages/AdminCareerRolesPage';
-import AdminFeedbackPage from './pages/AdminFeedbackPage';
-import AdminPlansPage from './pages/AdminPlansPage';
-import AdminSkillScoresPage from './pages/AdminSkillScoresPage';
-import AdminUsersPage from './pages/AdminUsersPage';
-import AnalysisResultPage from './pages/AnalysisResultPage';
-import ForgotPasswordPage from './pages/ForgotPasswordPage';
-import GuidePage from './pages/GuidePage';
-import HistoryPage from './pages/HistoryPage';
-import DashboardPage from './pages/DashboardPage';
-import LandingPage from './pages/LandingPage';
-import PlansPage from './pages/PlansPage';
-import ProfilePage from './pages/ProfilePage';
-import RegisterPage from './pages/RegisterPage';
-import ResetPasswordPage from './pages/ResetPasswordPage';
-import LoginPage from './pages/LoginPage';
-import UploadCvPage from './pages/UploadCvPage';
-import VerifyEmailPage from './pages/VerifyEmailPage';
-import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
-import DataPolicyPage from './pages/DataPolicyPage';
-import GeneralInfoPage from './pages/GeneralInfoPage';
 import { formatPlanExpiry } from './data/plans';
 import { apiService, clearAuthSession, getStoredAuthSession, getStoredAuthUser } from './services/api';
+
+const AdminAnalyticsPage = lazy(() => import('./pages/AdminAnalyticsPage'));
+const AdminCareerRolesPage = lazy(() => import('./pages/AdminCareerRolesPage'));
+const AdminFeedbackPage = lazy(() => import('./pages/AdminFeedbackPage'));
+const AdminPlansPage = lazy(() => import('./pages/AdminPlansPage'));
+const AdminSkillScoresPage = lazy(() => import('./pages/AdminSkillScoresPage'));
+const AdminUsersPage = lazy(() => import('./pages/AdminUsersPage'));
+const AnalysisResultPage = lazy(() => import('./pages/AnalysisResultPage'));
+const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
+const GuidePage = lazy(() => import('./pages/GuidePage'));
+const HistoryPage = lazy(() => import('./pages/HistoryPage'));
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const LandingPage = lazy(() => import('./pages/LandingPage'));
+const PlansPage = lazy(() => import('./pages/PlansPage'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const RegisterPage = lazy(() => import('./pages/RegisterPage'));
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const UploadCvPage = lazy(() => import('./pages/UploadCvPage'));
+const VerifyEmailPage = lazy(() => import('./pages/VerifyEmailPage'));
+const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
+const DataPolicyPage = lazy(() => import('./pages/DataPolicyPage'));
+const GeneralInfoPage = lazy(() => import('./pages/GeneralInfoPage'));
 
 const navigationItems = [
   { label: 'Tổng quan', path: '/', icon: 'grid' },
@@ -379,7 +380,15 @@ function AppRoutes() {
 function App() {
   return (
     <BrowserRouter>
-      <AppRoutes />
+      <Suspense
+        fallback={(
+          <div className="grid min-h-screen place-items-center bg-slate-50 text-sm font-semibold text-slate-500">
+            Đang tải trang...
+          </div>
+        )}
+      >
+        <AppRoutes />
+      </Suspense>
     </BrowserRouter>
   );
 }

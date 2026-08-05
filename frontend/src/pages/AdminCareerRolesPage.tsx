@@ -31,6 +31,7 @@ function StatusPill({ status }: { status: 'active' | 'inactive' }) {
 export default function AdminCareerRolesPage() {
   const [roles, setRoles] = useState<AdminCareerRole[]>([]);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
@@ -44,12 +45,17 @@ export default function AdminCareerRolesPage() {
   const formIsValid = useMemo(() => form.name.trim().length > 0 && form.description.trim().length > 0, [form]);
 
   useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search), 350);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
     let active = true;
     async function loadRoles() {
       setLoading(true);
       setErrorMessage('');
       try {
-        const result = await apiService.getAdminCareerRoles({ search, status: statusFilter });
+        const result = await apiService.getAdminCareerRoles({ search: debouncedSearch, status: statusFilter });
         if (active) setRoles(result.data);
       } catch (error) {
         if (active) setErrorMessage(getApiErrorMessage(error));
@@ -61,7 +67,7 @@ export default function AdminCareerRolesPage() {
     return () => {
       active = false;
     };
-  }, [search, statusFilter]);
+  }, [debouncedSearch, statusFilter]);
 
   async function reloadRoles() {
     const result = await apiService.getAdminCareerRoles({ search, status: statusFilter });

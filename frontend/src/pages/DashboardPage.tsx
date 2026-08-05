@@ -34,7 +34,7 @@ export default function DashboardPage() {
     const fetchData = async () => {
       try {
         const [historyRes, quotaRes] = await Promise.all([
-          apiService.getHistory(10),
+          apiService.getHistory(3),
           apiService.getQuota()
         ]);
         setHistory(historyRes.data || []);

@@ -35,7 +35,7 @@ class AnalysisCreateRequest(BaseModel):
 
 @career_role_router.get("", summary="UC-013: Danh sách vị trí mục tiêu")
 async def get_career_roles() -> dict[str, Any]:
-    roles = await list_career_roles(db)
+    roles = await list_career_roles(db, include_skills=False)
     active_roles = [role for role in roles if role.get("status") == "active"]
     return {"data": active_roles, "meta": {"count": len(active_roles)}}
 
@@ -106,7 +106,28 @@ async def upload_cv(
 @router.get("/{cv_id}", summary="UC-012: Xem metadata CV đã tải")
 async def get_cv_metadata(cv_id: str, user: dict[str, str] = Depends(get_current_user)) -> dict[str, Any]:
     try:
-        cv = await db["CV"].find_one({"_id": cv_id, "MaKH": user["user_id"]})
+        cv = await db["CV"].find_one(
+            {"_id": cv_id, "MaKH": user["user_id"]},
+            {
+                "_id": 1,
+                "TenFileGoc": 1,
+                "Loai": 1,
+                "DungLuong": 1,
+                "TrangThai": 1,
+                "NgayTaiLen": 1,
+                "MaNganh": 1,
+                "Consent": 1,
+                "Extraction.text_length": 1,
+                "Extraction.page_count": 1,
+                "Extraction.method": 1,
+                "Extraction.language_hints": 1,
+                "Extraction.warnings": 1,
+                "Extraction.quality_score": 1,
+                "Extraction.section_parser": 1,
+                "Extraction.section_parser_model": 1,
+                "Extraction.section_parser_prompt_version": 1,
+            },
+        )
     except DATABASE_ERRORS as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -147,6 +168,8 @@ async def create_analysis(
     from datetime import datetime, timezone
 
     quota_state = await resolve_quota_state(db, user["user_id"], datetime.now(timezone.utc))
+    # Reject exhausted accounts before the expensive GPT analysis starts.
+    await ensure_analysis_quota_available(db, user["user_id"], state=quota_state)
     await record_product_event_safely(
         db,
         event_name="analysis_started",
@@ -160,6 +183,7 @@ async def create_analysis(
         role_id=payload.career_role_id,
         user_id=user["user_id"],
         current_plan=quota_state["account_type"],
+        quota_state=quota_state,
     )
     await record_product_event_safely(
         db,

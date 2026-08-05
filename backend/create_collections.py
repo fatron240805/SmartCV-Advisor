@@ -631,6 +631,8 @@ async def main():
             "SUKIEN_SANPHAM": MVP_INDEXES["SUKIEN_SANPHAM"],
             "GOIDV": MVP_INDEXES["GOIDV"],
         }
+        # Keep the manual seed command aligned with the runtime bootstrap.
+        indexes.update(MVP_INDEXES)
 
         # =============================================================
         # TẠO COLLECTION, INDEX VÀ UPSERT DỮ LIỆU

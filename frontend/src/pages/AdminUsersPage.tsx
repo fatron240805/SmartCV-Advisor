@@ -79,6 +79,7 @@ function dateParam(value: string, endOfDay = false) {
 
 export default function AdminUsersPage() {
   const [filters, setFilters] = useState<UserFilters>({ search: '', accountType: 'all', status: 'all', dateFrom: '', dateTo: '' });
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [users, setUsers] = useState<AdminUserSummary[]>([]);
   const [selectedUser, setSelectedUser] = useState<AdminUserDetail | null>(null);
   const [lockUser, setLockUser] = useState<AdminUserDetail | null>(null);
@@ -93,13 +94,18 @@ export default function AdminUsersPage() {
   const [toast, setToast] = useState('');
 
   useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(filters.search), 350);
+    return () => window.clearTimeout(timer);
+  }, [filters.search]);
+
+  useEffect(() => {
     let active = true;
     async function loadUsers() {
       setLoading(true);
       setErrorMessage('');
       try {
         const result = await apiService.getAdminUsers({
-          search: filters.search,
+          search: debouncedSearch,
           account_type: filters.accountType,
           status: filters.status,
           date_from: dateParam(filters.dateFrom),
@@ -121,7 +127,7 @@ export default function AdminUsersPage() {
     return () => {
       active = false;
     };
-  }, [filters, page]);
+  }, [debouncedSearch, filters.accountType, filters.status, filters.dateFrom, filters.dateTo, page]);
 
   async function reloadUsers() {
     const result = await apiService.getAdminUsers({

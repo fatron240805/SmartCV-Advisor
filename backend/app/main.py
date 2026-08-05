@@ -35,7 +35,7 @@ from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .db import MONGODB_DB, db
+from .db import MONGODB_DB, client, db
 from .services.analysis_service import DATABASE_ERRORS
 from .services.database_bootstrap import ensure_default_service_plans, ensure_mvp_collections
 from .services.email_service import is_email_delivery_configured
@@ -100,6 +100,11 @@ async def bootstrap_mvp_database() -> None:
         # Keep the health endpoint available in degraded mode. Write paths call
         # the bootstrap again before relying on a uniqueness constraint.
         app.state.database_bootstrap_error = exc.__class__.__name__
+
+
+@app.on_event("shutdown")
+async def close_database_client() -> None:
+    client.close()
 
 
 @app.get("/")
