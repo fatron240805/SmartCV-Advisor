@@ -510,10 +510,13 @@ function SectionScoreBar({
   onSelect: (section: string) => void;
 }) {
   const percentage = item.max_score > 0 ? Math.max(0, Math.min(100, Math.round((item.score / item.max_score) * 100))) : 0;
+  const detailsId = `section-score-details-${item.section.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
   return (
     <button
       type="button"
       aria-pressed={selected}
+      aria-expanded={selected}
+      aria-controls={detailsId}
       className={[
         'w-full rounded-xl border p-3 text-left transition focus:outline-none focus:ring-2 focus:ring-blue-200',
         selected ? 'border-blue-200 bg-blue-50/70' : 'border-transparent hover:border-slate-200 hover:bg-slate-50',
@@ -522,8 +525,18 @@ function SectionScoreBar({
     >
       <div className="mb-2 flex items-center justify-between text-sm">
         <span className="font-medium text-slate-600">{getSectionLabel(item.section)}</span>
-        <span className={`font-bold ${scoreTextColor(percentage)}`}>
-          {item.score}/{item.max_score}
+        <span className="flex items-center gap-2">
+          <span className={`font-bold ${scoreTextColor(percentage)}`}>
+            {item.score}/{item.max_score}
+          </span>
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 20 20"
+            fill="none"
+            className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${selected ? 'rotate-180' : ''}`}
+          >
+            <path d="m5 7.5 5 5 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
         </span>
       </div>
       <div className="h-2 overflow-hidden rounded-full bg-slate-100">
@@ -592,9 +605,10 @@ function getSectionSubScores(item: SectionScore): NormalizedSubScore[] {
 
 function SectionSubScorePanel({ item }: { item: SectionScore }) {
   const subScores = getSectionSubScores(item);
+  const detailsId = `section-score-details-${item.section.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
 
   return (
-    <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50/70 p-5">
+    <div id={detailsId} className="mt-2 rounded-2xl border border-blue-100 bg-blue-50/70 p-5">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-500">Điểm thành phần</p>
@@ -1016,11 +1030,10 @@ export default function AnalysisResultPage() {
     ? new Date(result.created_at).toLocaleDateString('vi-VN')
     : 'Chưa có ngày';
   const activeSectionScore = result.section_scores.find((section) => section.section === activeTab);
-  const selectedSectionScore =
-    result.section_scores.find((section) => section.section === selectedSectionName) ?? result.section_scores[0];
+  const selectedSectionScore = result.section_scores.find((section) => section.section === selectedSectionName);
 
   const handleSectionScoreSelect = (section: string) => {
-    setSelectedSectionName(section);
+    setSelectedSectionName((currentSection) => currentSection === section ? null : section);
     setActiveTab(section);
   };
 
@@ -1107,18 +1120,22 @@ export default function AnalysisResultPage() {
 
         <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
           <h2 className="text-xl font-bold text-slate-950">Điểm 6 phần CV</h2>
-          <p className="mt-2 text-sm text-slate-500">Tổng điểm được tính từ 6 phần của CV, tối đa 100 điểm.</p>
+          <p className="mt-2 text-sm text-slate-500">Tổng điểm được tính từ 6 phần của CV, tối đa 100 điểm. Nhấn vào từng phần để xem chi tiết.</p>
           <div className="mt-6 space-y-3">
-            {result.section_scores.map((score) => (
-              <SectionScoreBar
-                key={score.section}
-                item={score}
-                selected={selectedSectionScore?.section === score.section}
-                onSelect={handleSectionScoreSelect}
-              />
-            ))}
+            {result.section_scores.map((score) => {
+              const selected = selectedSectionScore?.section === score.section;
+              return (
+                <div key={score.section}>
+                  <SectionScoreBar
+                    item={score}
+                    selected={selected}
+                    onSelect={handleSectionScoreSelect}
+                  />
+                  {selected && <SectionSubScorePanel item={score} />}
+                </div>
+              );
+            })}
           </div>
-          {selectedSectionScore && <SectionSubScorePanel item={selectedSectionScore} />}
         </div>
       </section>
 
