@@ -16,6 +16,15 @@
 
 **Frontend**: React 19 + TypeScript, Vite, React Router, Tailwind CSS, Axios.
 
+## Thư viện, template, công cụ AI và tài nguyên bên ngoài
+
+- **Thư viện Backend (Python)**: FastAPI, Uvicorn, python-multipart, python-dotenv, OpenAI SDK, PyMuPDF, python-docx, Motor, PyMongo, PyJWT, Pydantic.
+- **Thư viện Backend (Node.js đã khai báo)**: mongodb, mysql2.
+- **Thư viện Frontend**: React, React DOM, React Router DOM, TypeScript, Vite, Tailwind CSS, Axios, ESLint.
+- **Công cụ AI sử dụng trong quá trình phát triển**: ChatGPT, Codex.
+- **Dịch vụ/tài nguyên bên ngoài**: OpenAI API/GPT model để trích xuất và phân tích CV, MongoDB để lưu trữ dữ liệu, SMTP để gửi email xác thực/quên mật khẩu.
+- **Template bên ngoài**: Chưa sử dụng template giao diện hoặc bộ mã nguồn bên ngoài; giao diện và logic được xây dựng trực tiếp trong dự án.
+
 ## Cấu trúc thư mục
 
 ```
