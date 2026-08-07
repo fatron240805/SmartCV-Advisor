@@ -106,7 +106,7 @@ python create_collections.py
 Chạy server:
 
 ```powershell
-uvicorn app.main:app --reload --app-dir backend
+python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 Backend mặc định chạy tại `http://127.0.0.1:8000`.
@@ -148,6 +148,6 @@ python -m unittest discover tests
 
 | Email                  | Mật khẩu   | Vai trò    |
 | ---------------------- | ---------- | ---------- |
-| `minhan@example.com`   | `Demo1234` | Registered |
+| `phamk51@gmail.com`   | `Demo1234` | Registered |
 | `hoangnam@example.com` | `Demo1234` | Premium    |
 | `admin@smartcv.vn`     | `Demo1234` | Admin      |
